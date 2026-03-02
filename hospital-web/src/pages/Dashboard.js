@@ -42,20 +42,16 @@ export default function Dashboard() {
    * On page load: get the current logged in user from Supabase
    * If no user is logged in, redirect back to login page
    */
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        // Not logged in — send back to login
-        navigate('/');
-        return;
-      }
-      setUser(user);
-      // Once we have the user, fetch their hospital's cases
-      fetchCases(user.email);
-    };
-    getUser();
-  }, [navigate]);
+ useEffect(() => {
+  const getUser = async () => {
+    // ── DEV MODE ────────────────────────────────────────────────────────────
+    const devEmail = 'venturevoyager.sam@gmail.com';
+    console.log('DEV_MODE: Using hardcoded email:', devEmail);
+    setUser({ email: devEmail });
+    fetchCases(devEmail);
+  };
+  getUser();
+}, [navigate]);
 
   // ── DATA FETCHING ──────────────────────────────────────────────────────────
 

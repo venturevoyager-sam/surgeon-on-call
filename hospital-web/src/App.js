@@ -1,13 +1,13 @@
 /**
  * APP.JS - Root Component
  * Sets up all routes for the hospital web app.
- * Protected routes require the user to be logged in.
  */
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import NewRequest from './pages/NewRequest';
 import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
@@ -17,14 +17,17 @@ export default function App() {
         {/* Login page — public */}
         <Route path="/" element={<Login />} />
 
-        {/* Dashboard — protected, must be logged in */}
+        {/* Dashboard — protected */}
         <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
+          <ProtectedRoute><Dashboard /></ProtectedRoute>
         } />
 
-        {/* Any unknown URL redirects to login */}
+        {/* New surgery request form — protected */}
+        <Route path="/new-request" element={
+          <ProtectedRoute><NewRequest /></ProtectedRoute>
+        } />
+
+        {/* Unknown URLs go to login */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
