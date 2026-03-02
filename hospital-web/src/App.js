@@ -8,6 +8,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import NewRequest from './pages/NewRequest';
+import Shortlist from './pages/Shortlist';
+import CaseDetail from './pages/CaseDetail';
 import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
@@ -25,6 +27,16 @@ export default function App() {
         {/* New surgery request form — protected */}
         <Route path="/new-request" element={
           <ProtectedRoute><NewRequest /></ProtectedRoute>
+        } />
+
+        {/* Shortlist page — protected */}
+        <Route path="/cases/:caseId/shortlist" element={
+          <ProtectedRoute><Shortlist /></ProtectedRoute>
+        } />
+
+        {/* Case detail and status page — protected */}
+        <Route path="/cases/:caseId" element={
+          <ProtectedRoute><CaseDetail /></ProtectedRoute>
         } />
 
         {/* Unknown URLs go to login */}

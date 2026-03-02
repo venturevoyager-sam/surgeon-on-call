@@ -1,1 +1,46 @@
 [2026-03-02 12:16:57] INFO: Surgeon on Call API started | {"port":"5000","company":"Vaidhya Healthcare Pvt Ltd"}
+[2026-03-02 12:33:01] INFO: → POST /api/cases | {"body":{"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f","procedure":"ee","specialty_required":"General Surgery","surgery_date":"2026-03-12","surgery_time":"12:32","duration_hours":1.5,"ot_number":"6","patient_name":"random","patient_age":25,"patient_gender":"male","fee_min":2000000,"fee_max":2500000,"notes":""},"query":{},"ip":"::1"}
+[2026-03-02 12:33:01] INFO: New case request received | {"body":{"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f","procedure":"ee","specialty_required":"General Surgery","surgery_date":"2026-03-12","surgery_time":"12:32","duration_hours":1.5,"ot_number":"6","patient_name":"random","patient_age":25,"patient_gender":"male","fee_min":2000000,"fee_max":2500000,"notes":""}}
+[2026-03-02 12:33:01] INFO: Verifying hospital | {"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f"}
+[2026-03-02 12:33:01] INFO: Hospital verified | {"hospital_name":"Vaidya Healthcare Pvt. Ltd","city":"Hyderabad"}
+[2026-03-02 12:33:01] INFO: Saving case to database
+[2026-03-02 12:33:01] INFO: Case saved successfully | {"case_id":"8e4665b3-cc07-42e9-ae17-73df66b3ee37","case_number":1,"procedure":"ee"}
+[2026-03-02 12:33:01] INFO: Running matching algorithm | {"specialty":"General Surgery","city":"Hyderabad"}
+[2026-03-02 12:33:01] INFO: Matching: querying verified surgeons | {"specialty_required":"General Surgery"}
+[2026-03-02 12:33:02] INFO: Matching: surgeons found before conflict check | {"count":0}
+[2026-03-02 12:33:02] INFO: Matching complete | {"surgeons_found":0}
+[2026-03-02 12:33:02] INFO: ← POST / 201 (712ms) | {"response":{"success":true}}
+[2026-03-02 12:37:46] INFO: → POST /api/cases | {"body":{"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f","procedure":"Oka chinna Procedure","specialty_required":"Laparoscopic Surgery","surgery_date":"2026-03-14","surgery_time":"14:39","duration_hours":1.5,"ot_number":"5","patient_name":"inko jarumithai","patient_age":66,"patient_gender":"male","fee_min":1500000,"fee_max":1800000,"notes":""},"query":{},"ip":"::1"}
+[2026-03-02 12:37:46] INFO: New case request received | {"body":{"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f","procedure":"Oka chinna Procedure","specialty_required":"Laparoscopic Surgery","surgery_date":"2026-03-14","surgery_time":"14:39","duration_hours":1.5,"ot_number":"5","patient_name":"inko jarumithai","patient_age":66,"patient_gender":"male","fee_min":1500000,"fee_max":1800000,"notes":""}}
+[2026-03-02 12:37:46] INFO: Verifying hospital | {"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f"}
+[2026-03-02 12:37:46] INFO: Hospital verified | {"hospital_name":"Vaidya Healthcare Pvt. Ltd","city":"Hyderabad"}
+[2026-03-02 12:37:46] INFO: Saving case to database
+[2026-03-02 12:37:46] INFO: Case saved successfully | {"case_id":"9cde4b0e-2031-41fa-ba65-8eb7a6416d18","case_number":2,"procedure":"Oka chinna Procedure"}
+[2026-03-02 12:37:46] INFO: Running matching algorithm | {"specialty":"Laparoscopic Surgery","city":"Hyderabad"}
+[2026-03-02 12:37:46] INFO: Matching: querying verified surgeons | {"specialty_required":"Laparoscopic Surgery"}
+[2026-03-02 12:37:47] INFO: Matching: surgeons found before conflict check | {"count":0}
+[2026-03-02 12:37:47] INFO: Matching complete | {"surgeons_found":0}
+[2026-03-02 12:37:47] INFO: ← POST / 201 (584ms) | {"response":{"success":true}}
+[2026-03-02 13:24:08] INFO: → POST /api/cases | {"body":{"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f","procedure":"Laproscopic","specialty_required":"Laparoscopic Surgery","surgery_date":"2026-03-07","surgery_time":"15:25","duration_hours":1.5,"ot_number":"3","patient_name":"inkoi mushtodu","patient_age":55,"patient_gender":"male","fee_min":2000000,"fee_max":2200000,"notes":""},"query":{},"ip":"::1"}
+[2026-03-02 13:24:08] INFO: New case request received | {"body":{"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f","procedure":"Laproscopic","specialty_required":"Laparoscopic Surgery","surgery_date":"2026-03-07","surgery_time":"15:25","duration_hours":1.5,"ot_number":"3","patient_name":"inkoi mushtodu","patient_age":55,"patient_gender":"male","fee_min":2000000,"fee_max":2200000,"notes":""}}
+[2026-03-02 13:24:08] INFO: Verifying hospital | {"hospital_id":"06d1ed01-006f-49d1-b27d-a34944a9dd4f"}
+[2026-03-02 13:24:08] INFO: Hospital verified | {"hospital_name":"Vaidya Healthcare Pvt. Ltd","city":"Hyderabad"}
+[2026-03-02 13:24:08] INFO: Saving case to database
+[2026-03-02 13:24:08] INFO: Case saved successfully | {"case_id":"c49e6033-96fa-4963-8483-e0afdb282218","case_number":3,"procedure":"Laproscopic"}
+[2026-03-02 13:24:08] INFO: Running matching algorithm | {"specialty":"Laparoscopic Surgery","city":"Hyderabad"}
+[2026-03-02 13:24:08] INFO: Matching: querying verified surgeons | {"specialty_required":"Laparoscopic Surgery"}
+[2026-03-02 13:24:08] INFO: Matching: surgeons found before conflict check | {"count":4}
+[2026-03-02 13:24:09] INFO: Matching: surgeons available after conflict check | {"count":4}
+[2026-03-02 13:24:09] INFO: Matching complete | {"total_matched":4,"top_surgeon":"Dr. Arjun Mehta"}
+[2026-03-02 13:24:09] INFO: Matching complete | {"surgeons_found":4}
+[2026-03-02 13:24:09] INFO: ← POST / 201 (1333ms) | {"response":{"success":true}}
+[2026-03-02 13:24:09] INFO: → GET /api/cases/c49e6033-96fa-4963-8483-e0afdb282218 | {"query":{},"ip":"::1"}
+[2026-03-02 13:24:09] INFO: Fetching case detail | {"case_id":"c49e6033-96fa-4963-8483-e0afdb282218"}
+[2026-03-02 13:24:09] INFO: Case detail fetched | {"case_id":"c49e6033-96fa-4963-8483-e0afdb282218","priority_list_count":0}
+[2026-03-02 13:24:09] INFO: ← GET /c49e6033-96fa-4963-8483-e0afdb282218 200 (282ms) | {"response":{"success":true}}
+[2026-03-02 13:24:09] INFO: → GET /api/cases/c49e6033-96fa-4963-8483-e0afdb282218 | {"query":{},"ip":"::1"}
+[2026-03-02 13:24:09] INFO: Fetching case detail | {"case_id":"c49e6033-96fa-4963-8483-e0afdb282218"}
+[2026-03-02 13:24:09] INFO: → GET /api/cases/c49e6033-96fa-4963-8483-e0afdb282218/matches | {"query":{},"ip":"::1"}
+[2026-03-02 13:24:09] INFO: Case detail fetched | {"case_id":"c49e6033-96fa-4963-8483-e0afdb282218","priority_list_count":0}
+[2026-03-02 13:24:09] INFO: ← GET /c49e6033-96fa-4963-8483-e0afdb282218 200 (270ms) | {"response":{"success":true}}
+[2026-03-02 13:24:09] INFO: → GET /api/cases/c49e6033-96fa-4963-8483-e0afdb282218/matches | {"query":{},"ip":"::1"}

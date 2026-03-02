@@ -3,9 +3,11 @@
  * Company: Vaidhya Healthcare Pvt Ltd
  *
  * Handles all API endpoints related to surgery cases:
- * - POST /api/cases     → Create a new surgery request
- * - GET  /api/cases     → List cases for a hospital
- * - GET  /api/cases/:id → Get a single case with full details
+ * - POST /api/cases              → Create a new surgery request
+ * - GET  /api/cases              → List cases for a hospital
+ * - GET  /api/cases/:id          → Get a single case with full details
+ * - GET  /api/cases/:id/matches  → Get matched surgeons for a case
+ * - PATCH /api/cases/:id/priority → Save priority list and trigger cascade
  */
 
 const express = require('express');
@@ -16,6 +18,7 @@ const logger = require('../logger');
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/cases
 // Create a new surgery request and run the matching algorithm
+// Called by: Hospital Web App — New Request form
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
   logger.info('New case request received', { body: req.body });
@@ -146,6 +149,7 @@ router.post('/', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cases
 // List all cases for a hospital
+// Called by: Hospital Web App — Dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
@@ -178,14 +182,78 @@ router.get('/', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/cases/:id/matches
+// Get matched surgeons for an existing case
+// Called by: Shortlist page on load
+// IMPORTANT: This route must be defined BEFORE GET /:id
+// because Express reads routes top to bottom —
+// if /:id is first, it will capture /matches as the id parameter
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:id/matches', async (req, res) => {
+  try {
+    const { id } = req.params;
+    logger.info('Fetching matches for case', { case_id: id });
+
+    // Step 1: Get the case details
+    const { data: case_, error: caseError } = await supabase
+      .from('cases')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (caseError || !case_) {
+      logger.warn('Case not found for matching', { case_id: id });
+      return res.status(404).json({ message: 'Case not found' });
+    }
+
+    // Step 2: Get the hospital city separately
+    const { data: hospital, error: hospitalError } = await supabase
+      .from('hospitals')
+      .select('city')
+      .eq('id', case_.hospital_id)
+      .single();
+
+    if (hospitalError) {
+      logger.warn('Hospital not found for case', { hospital_id: case_.hospital_id });
+    }
+
+    const city = hospital?.city || '';
+    logger.info('Fetched hospital city for matching', { city });
+
+    // Step 3: Run matching algorithm with case details
+    const matchedSurgeons = await matchSurgeons({
+      specialty_required: case_.specialty_required,
+      surgery_date:       case_.surgery_date,
+      surgery_time:       case_.surgery_time,
+      city,
+      fee_min:            case_.fee_min,
+      fee_max:            case_.fee_max,
+    });
+
+    logger.info('Matches fetched', {
+      case_id: id,
+      matches_found: matchedSurgeons.length
+    });
+
+    return res.json({ matched_surgeons: matchedSurgeons });
+
+  } catch (error) {
+    logger.error('Error fetching matches', { error: error.message });
+    return res.status(500).json({ message: 'Failed to fetch matches' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cases/:id
-// Get a single case with priority list
+// Get a single case with full details including priority list
+// Called by: Hospital Web App — Case Detail page
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     logger.info('Fetching case detail', { case_id: id });
 
+    // Fetch the case
     const { data: case_, error: caseError } = await supabase
       .from('cases')
       .select('*')
@@ -197,6 +265,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Case not found' });
     }
 
+    // Fetch the priority list for this case with surgeon details
     const { data: priorityList, error: priorityError } = await supabase
       .from('case_priority_list')
       .select(`
@@ -231,8 +300,155 @@ router.get('/:id', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/cases/:id/priority
+// Save the hospital's priority list and trigger the cascade
+// Called by: Shortlist page — when SPOC clicks Send Requests
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:id/priority', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { priority_list } = req.body;
+
+    logger.info('Saving priority list for case', {
+      case_id: id,
+      surgeons: priority_list
+    });
+
+    // Validate priority list
+    if (!priority_list || !Array.isArray(priority_list) || priority_list.length < 3) {
+      return res.status(400).json({
+        message: 'Priority list must contain at least 3 surgeon IDs'
+      });
+    }
+
+    if (priority_list.length > 5) {
+      return res.status(400).json({
+        message: 'Priority list cannot have more than 5 surgeons'
+      });
+    }
+
+    // Verify case exists
+    const { data: case_, error: caseError } = await supabase
+      .from('cases')
+      .select('id, status')
+      .eq('id', id)
+      .single();
+
+    if (caseError || !case_) {
+      return res.status(404).json({ message: 'Case not found' });
+    }
+
+    // Insert each surgeon into case_priority_list table
+    // with their priority order number
+    const priorityRows = priority_list.map((surgeon_id, index) => ({
+      case_id:        id,
+      surgeon_id:     surgeon_id,
+      priority_order: index + 1,  // 1-based (1 = highest priority)
+      status:         'pending',
+    }));
+
+    logger.info('Inserting priority list rows', { count: priorityRows.length });
+
+    const { error: insertError } = await supabase
+      .from('case_priority_list')
+      .insert(priorityRows);
+
+    if (insertError) {
+      logger.error('Failed to insert priority list', { error: insertError.message });
+      return res.status(500).json({ message: 'Failed to save priority list' });
+    }
+
+    // Update case status to 'cascading'
+    const { error: updateError } = await supabase
+      .from('cases')
+      .update({ status: 'cascading' })
+      .eq('id', id);
+
+    if (updateError) {
+      logger.error('Failed to update case status', { error: updateError.message });
+    }
+
+    // Trigger cascade — notify the first surgeon
+    await triggerCascade(id);
+
+    logger.info('Priority list saved and cascade triggered', { case_id: id });
+
+    return res.json({
+      message: 'Priority list saved. Requests sent to surgeons.',
+      case_id: id,
+    });
+
+  } catch (error) {
+    logger.error('Error saving priority list', { error: error.message });
+    return res.status(500).json({ message: 'Failed to save priority list' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRIGGER CASCADE
+// Notifies the next surgeon in the priority list
+// Called after priority list is saved, and after each decline/expiry
+// ─────────────────────────────────────────────────────────────────────────────
+async function triggerCascade(caseId) {
+  logger.info('Triggering cascade for case', { case_id: caseId });
+
+  try {
+    // Find the next pending surgeon in the priority list
+    const { data: nextRow, error } = await supabase
+      .from('case_priority_list')
+      .select('*, surgeons(name, phone, email)')
+      .eq('case_id', caseId)
+      .eq('status', 'pending')
+      .order('priority_order', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (error || !nextRow) {
+      logger.warn('No pending surgeons left in cascade', { case_id: caseId });
+      // Update case to unfilled
+      await supabase
+        .from('cases')
+        .update({ status: 'unfilled' })
+        .eq('id', caseId);
+      return;
+    }
+
+    // Set expires_at to 2 hours from now
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 2);
+
+    // Update this surgeon's row to 'notified'
+    const { error: updateError } = await supabase
+      .from('case_priority_list')
+      .update({
+        status:       'notified',
+        notified_at:  new Date().toISOString(),
+        expires_at:   expiresAt.toISOString(),
+      })
+      .eq('id', nextRow.id);
+
+    if (updateError) {
+      logger.error('Failed to update cascade row', { error: updateError.message });
+      return;
+    }
+
+    logger.info('Cascade: surgeon notified', {
+      surgeon_name:   nextRow.surgeons?.name,
+      priority_order: nextRow.priority_order,
+      expires_at:     expiresAt.toISOString(),
+    });
+
+    // TODO Sprint 5: Send SMS/WhatsApp/Push notification to surgeon here
+
+  } catch (error) {
+    logger.error('Error in cascade trigger', { error: error.message });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MATCHING ALGORITHM
 // Finds best available surgeons for a given case
+// Returns up to 7 surgeons ordered by best match score
 // ─────────────────────────────────────────────────────────────────────────────
 async function matchSurgeons({ specialty_required, surgery_date, surgery_time, city, fee_min, fee_max }) {
   try {
@@ -258,7 +474,7 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
 
     if (!surgeons || surgeons.length === 0) return [];
 
-    // Filter out surgeons with conflicting cases on same date
+    // Filter out surgeons with conflicting cases on same date and time
     const availableSurgeons = [];
     for (const surgeon of surgeons) {
       const { data: conflicts } = await supabase
@@ -271,9 +487,9 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
       if (!conflicts || conflicts.length === 0) {
         availableSurgeons.push(surgeon);
       } else {
-        logger.debug('Surgeon has conflict, excluded', {
-          surgeon_id: surgeon.id,
+        logger.debug('Surgeon has conflict on requested date, excluded', {
           surgeon_name: surgeon.name,
+          surgery_date,
         });
       }
     }
@@ -282,15 +498,25 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
       count: availableSurgeons.length
     });
 
-    // Score and rank surgeons
+    // Score each surgeon based on matching criteria
     const scoredSurgeons = availableSurgeons.map(surgeon => {
       let score = 0;
-      if (surgeon.city.toLowerCase() === city.toLowerCase()) score += 50;
+
+      // City match: same city gets big boost
+      if (surgeon.city.toLowerCase() === city.toLowerCase()) {
+        score += 50;
+      }
+
+      // Rating: higher rating = higher score (max 50 points)
       score += (surgeon.rating || 0) * 10;
+
+      // Experience on platform: more cases = slight boost (max 20 points)
       score += Math.min(surgeon.total_cases / 10, 20);
+
       return { ...surgeon, match_score: score };
     });
 
+    // Sort by score highest first, return top 7
     scoredSurgeons.sort((a, b) => b.match_score - a.match_score);
     const topSurgeons = scoredSurgeons.slice(0, 7);
 
