@@ -32,6 +32,7 @@ const requestLogger = require('./middleware/requestLogger');
 
 // ── ROUTE IMPORTS ─────────────────────────────────────────────────────────────
 const casesRouter = require('./routes/cases');
+const surgeonsRouter = require('./routes/surgeons');
 
 // ── CONFIGURATION ─────────────────────────────────────────────────────────────
 const app = express();
@@ -70,6 +71,8 @@ app.get('/', async (req, res) => {
   }
 });
 
+//app.use('/api/cases', casesRouter);
+app.use('/api/surgeons', surgeonsRouter);
 app.use('/api/cases', casesRouter);
 
 // ── GLOBAL ERROR HANDLER ──────────────────────────────────────────────────────

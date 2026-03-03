@@ -12,6 +12,7 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export default function Login() {
@@ -27,6 +28,7 @@ export default function Login() {
   
   // isError: true if message is an error (shown in red), false for success (shown in green)
   const [isError, setIsError] = useState(false);
+  const navigate = useNavigate();
 
   // ── HANDLE LOGIN ───────────────────────────────────────────────────────────
   /**
@@ -133,7 +135,16 @@ export default function Login() {
             </div>
           )}
         </div>
-
+          {/* DEV MODE: Skip login button — remove before going live */}
+        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+          <p className="text-xs text-amber-600 font-semibold mb-2">DEV MODE</p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-6 py-2 rounded-lg transition"
+          >
+            Skip Login → Go to Dashboard
+          </button>
+        </div>
         {/* Footer note */}
         <p className="text-center text-xs text-gray-400 mt-6">
           Only verified hospital accounts can access this portal. 

@@ -533,4 +533,171 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/cases/:caseId/surgeon-view
+// Returns case details for the surgeon mobile app.
+// Hospital full address is hidden until surgeon accepts.
+// Called by: RequestDetailScreen
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:caseId/surgeon-view', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { surgeon_id } = req.query;
+
+    logger.info('Fetching surgeon view for case', { case_id: caseId, surgeon_id });
+
+    // Fetch the case
+    const { data: case_, error: caseError } = await supabase
+      .from('cases')
+      .select('*')
+      .eq('id', caseId)
+      .single();
+
+    if (caseError || !case_) {
+      return res.status(404).json({ message: 'Case not found' });
+    }
+
+    // Fetch hospital city only (full address hidden until surgeon accepts)
+    const { data: hospital } = await supabase
+      .from('hospitals')
+      .select('city')
+      .eq('id', case_.hospital_id)
+      .single();
+
+    // Fetch this surgeon's priority list row to get expires_at
+    let expiresAt = null;
+    if (surgeon_id) {
+      const { data: priorityRow } = await supabase
+        .from('case_priority_list')
+        .select('expires_at, status')
+        .eq('case_id', caseId)
+        .eq('surgeon_id', surgeon_id)
+        .single();
+
+      expiresAt = priorityRow?.expires_at || null;
+    }
+
+    logger.info('Surgeon view fetched', { case_id: caseId });
+
+    return res.json({
+      case: {
+        ...case_,
+        hospital_city: hospital?.city || null,
+        expires_at: expiresAt,
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error fetching surgeon case view', { error: error.message });
+    return res.status(500).json({ message: 'Failed to fetch case' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/cases/:caseId/accept
+// Surgeon accepts the case.
+// Updates case_priority_list row to 'accepted', case status to 'confirmed',
+// and sets confirmed_surgeon_id on the case.
+// Called by: RequestDetailScreen
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:caseId/accept', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { surgeon_id } = req.body;
+
+    logger.info('Surgeon accepting case', { case_id: caseId, surgeon_id });
+
+    if (!surgeon_id) {
+      return res.status(400).json({ message: 'surgeon_id required' });
+    }
+
+    const now = new Date().toISOString();
+
+    // Update priority list row to accepted
+    const { error: priorityError } = await supabase
+      .from('case_priority_list')
+      .update({
+        status: 'accepted',
+        responded_at: now,
+      })
+      .eq('case_id', caseId)
+      .eq('surgeon_id', surgeon_id);
+
+    if (priorityError) {
+      logger.error('Failed to update priority list on accept', { error: priorityError.message });
+      return res.status(500).json({ message: 'Failed to accept case' });
+    }
+
+    // Update case to confirmed with this surgeon
+    const { error: caseError } = await supabase
+      .from('cases')
+      .update({
+        status: 'confirmed',
+        confirmed_surgeon_id: surgeon_id,
+      })
+      .eq('id', caseId);
+
+    if (caseError) {
+      logger.error('Failed to confirm case', { error: caseError.message });
+      return res.status(500).json({ message: 'Failed to confirm case' });
+    }
+
+    logger.info('Case accepted successfully', { case_id: caseId, surgeon_id });
+    return res.json({ message: 'Case accepted successfully' });
+
+  } catch (error) {
+    logger.error('Error accepting case', { error: error.message });
+    return res.status(500).json({ message: 'Failed to accept case' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/cases/:caseId/decline
+// Surgeon declines the case.
+// Updates case_priority_list row to 'declined', then triggers cascade
+// to notify the next surgeon in the priority list.
+// Called by: RequestDetailScreen
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:caseId/decline', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { surgeon_id } = req.body;
+
+    logger.info('Surgeon declining case', { case_id: caseId, surgeon_id });
+
+    if (!surgeon_id) {
+      return res.status(400).json({ message: 'surgeon_id required' });
+    }
+
+    const now = new Date().toISOString();
+
+    // Update this surgeon's row to declined
+    const { error: priorityError } = await supabase
+      .from('case_priority_list')
+      .update({
+        status: 'declined',
+        responded_at: now,
+      })
+      .eq('case_id', caseId)
+      .eq('surgeon_id', surgeon_id);
+
+    if (priorityError) {
+      logger.error('Failed to update priority list on decline', { error: priorityError.message });
+      return res.status(500).json({ message: 'Failed to decline case' });
+    }
+
+    // Trigger cascade — notify next surgeon in the list
+    await triggerCascade(caseId);
+
+    logger.info('Case declined, cascade triggered', { case_id: caseId });
+    return res.json({ message: 'Case declined' });
+
+  } catch (error) {
+    logger.error('Error declining case', { error: error.message });
+    return res.status(500).json({ message: 'Failed to decline case' });
+  }
+});
+
+
+
 module.exports = router;
