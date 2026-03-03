@@ -1,0 +1,432 @@
+/**
+ * surgeons.js — Backend routes for the Surgeon Mobile App
+ * 
+ * Covers:
+ *   GET    /api/surgeons/:id                  → surgeon profile
+ *   PATCH  /api/surgeons/:id/availability     → toggle online/offline
+ *   GET    /api/surgeons/:id/requests         → active case requests
+ *   GET    /api/surgeons/:id/earnings         → earnings summary
+ *   GET    /api/cases/:id/surgeon-view        → case detail for surgeon
+ *   PATCH  /api/cases/:id/accept              → surgeon accepts a case
+ *   PATCH  /api/cases/:id/decline             → surgeon declines a case
+ * 
+ * DEV_MODE=true bypasses JWT auth; surgeon ID comes from the URL param.
+ * In production, we'll verify the JWT and ensure surgeons can only see their own data.
+ */
+
+const express = require('express');
+const router = express.Router();
+const { createClient } = require('@supabase/supabase-js');
+
+// ---------------------------------------------------------------------------
+// Supabase admin client (service role key — never exposed to the client)
+// ---------------------------------------------------------------------------
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY // use service role so we can bypass RLS
+);
+
+const DEV_MODE = process.env.DEV_MODE === 'true';
+
+// ---------------------------------------------------------------------------
+// Tiny auth middleware
+// In DEV_MODE we skip token verification.
+// In production: verify Supabase JWT and attach user to req.
+// ---------------------------------------------------------------------------
+async function authMiddleware(req, res, next) {
+  if (DEV_MODE) {
+    // Just let it through — surgeon ID comes from :id param
+    return next();
+  }
+  // TODO: verify Authorization: Bearer <token> against Supabase
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Missing auth token' });
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return res.status(401).json({ error: 'Invalid token' });
+
+  req.user = user;
+  next();
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/surgeons/:id
+// Returns full surgeon profile including specializations array
+// ---------------------------------------------------------------------------
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: surgeon, error } = await supabase
+      .from('surgeons')
+      .select(`
+        id,
+        full_name,
+        phone,
+        email,
+        specialization,
+        experience_years,
+        city,
+        availability_status,
+        rating,
+        total_cases,
+        profile_photo_url,
+        created_at
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!surgeon) return res.status(404).json({ error: 'Surgeon not found' });
+
+    res.json({ surgeon });
+  } catch (err) {
+    console.error('[GET /surgeons/:id]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/surgeons/:id/availability
+// Body: { availability_status: 'available' | 'busy' | 'offline' }
+// ---------------------------------------------------------------------------
+router.patch('/:id/availability', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { availability_status } = req.body;
+
+    const validStatuses = ['available', 'busy', 'offline'];
+    if (!validStatuses.includes(availability_status)) {
+      return res.status(400).json({
+        error: `availability_status must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+
+    const { data: surgeon, error } = await supabase
+      .from('surgeons')
+      .update({ availability_status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id, availability_status')
+      .single();
+
+    if (error) throw error;
+
+    res.json({ surgeon, message: `Status updated to ${availability_status}` });
+  } catch (err) {
+    console.error('[PATCH /surgeons/:id/availability]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/surgeons/:id/requests
+// Returns all case_assignments for this surgeon with nested case + hospital info
+// Sorted by: active first (pending_surgeon_response), then by created_at desc
+// ---------------------------------------------------------------------------
+router.get('/:id/requests', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: assignments, error } = await supabase
+      .from('case_assignments')
+      .select(`
+        id,
+        status,
+        assigned_at,
+        responded_at,
+        priority_tier,
+        cases (
+          id,
+          surgery_type,
+          specialization,
+          urgency_level,
+          status,
+          scheduled_date,
+          scheduled_time,
+          estimated_duration_hours,
+          special_notes,
+          created_at,
+          hospitals (
+            id,
+            name,
+            city,
+            address
+          )
+        )
+      `)
+      .eq('surgeon_id', id)
+      .order('assigned_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Separate active requests (need response) from historical ones
+    const active = assignments.filter(a => a.status === 'pending_surgeon_response');
+    const history = assignments.filter(a => a.status !== 'pending_surgeon_response');
+
+    res.json({ active, history, total: assignments.length });
+  } catch (err) {
+    console.error('[GET /surgeons/:id/requests]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/surgeons/:id/earnings
+// Returns earnings summary: total, this month, pending, per-case breakdown
+// ---------------------------------------------------------------------------
+router.get('/:id/earnings', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get all accepted/completed assignments for this surgeon
+    // In a real system, there'd be a separate payments/invoices table.
+    // For now, we compute estimated earnings from cases.
+    const { data: assignments, error } = await supabase
+      .from('case_assignments')
+      .select(`
+        id,
+        status,
+        assigned_at,
+        cases (
+          id,
+          surgery_type,
+          urgency_level,
+          agreed_fee,
+          status,
+          scheduled_date,
+          hospitals (
+            name
+          )
+        )
+      `)
+      .eq('surgeon_id', id)
+      .in('status', ['accepted', 'completed']);
+
+    if (error) throw error;
+
+    // Compute summary figures
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    let totalEarnings = 0;
+    let thisMonthEarnings = 0;
+    let pendingEarnings = 0; // cases accepted but not yet completed
+
+    const breakdown = assignments.map(a => {
+      const fee = a.cases?.agreed_fee || 0;
+      // Surgeon gets 95% (Vaidhya takes 5% commission)
+      const surgeonFee = parseFloat((fee * 0.95).toFixed(2));
+      const caseDate = new Date(a.assigned_at);
+
+      totalEarnings += surgeonFee;
+
+      if (a.cases?.status === 'completed') {
+        if (caseDate >= startOfMonth) thisMonthEarnings += surgeonFee;
+      } else {
+        // accepted but not completed → pending payout
+        pendingEarnings += surgeonFee;
+      }
+
+      return {
+        assignment_id: a.id,
+        case_id: a.cases?.id,
+        surgery_type: a.cases?.surgery_type,
+        hospital_name: a.cases?.hospitals?.name,
+        scheduled_date: a.cases?.scheduled_date,
+        agreed_fee: fee,
+        surgeon_fee: surgeonFee, // after 5% platform commission
+        case_status: a.cases?.status,
+        assignment_status: a.status,
+        date: a.assigned_at
+      };
+    });
+
+    res.json({
+      summary: {
+        total_earnings: totalEarnings,
+        this_month: thisMonthEarnings,
+        pending_payout: pendingEarnings,
+        total_cases: assignments.length,
+        commission_rate: 0.05 // 5% Vaidhya commission
+      },
+      breakdown
+    });
+  } catch (err) {
+    console.error('[GET /surgeons/:id/earnings]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/cases/:id/surgeon-view
+// Returns the case detail view optimised for the surgeon — includes hospital
+// info, case details, and the surgeon's assignment record for this case.
+// :surgeonId is passed as a query param so we can fetch the right assignment.
+// ---------------------------------------------------------------------------
+router.get('/cases/:caseId/surgeon-view', authMiddleware, async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { surgeonId } = req.query; // ?surgeonId=xxx
+
+    if (!surgeonId) {
+      return res.status(400).json({ error: 'surgeonId query param required' });
+    }
+
+    // Fetch case with hospital info
+    const { data: caseData, error: caseError } = await supabase
+      .from('cases')
+      .select(`
+        id,
+        surgery_type,
+        specialization,
+        urgency_level,
+        status,
+        scheduled_date,
+        scheduled_time,
+        estimated_duration_hours,
+        special_notes,
+        agreed_fee,
+        created_at,
+        hospitals (
+          id,
+          name,
+          city,
+          address,
+          phone,
+          contact_person
+        )
+      `)
+      .eq('id', caseId)
+      .single();
+
+    if (caseError) throw caseError;
+    if (!caseData) return res.status(404).json({ error: 'Case not found' });
+
+    // Fetch the specific assignment for this surgeon
+    const { data: assignment, error: assignError } = await supabase
+      .from('case_assignments')
+      .select('id, status, assigned_at, responded_at, priority_tier, response_deadline')
+      .eq('case_id', caseId)
+      .eq('surgeon_id', surgeonId)
+      .single();
+
+    if (assignError && assignError.code !== 'PGRST116') throw assignError;
+
+    // Compute time remaining on the response window (if pending)
+    let timeRemainingSeconds = null;
+    if (assignment?.status === 'pending_surgeon_response' && assignment?.response_deadline) {
+      const deadline = new Date(assignment.response_deadline);
+      timeRemainingSeconds = Math.max(0, Math.floor((deadline - new Date()) / 1000));
+    }
+
+    res.json({
+      case: caseData,
+      assignment: assignment || null,
+      time_remaining_seconds: timeRemainingSeconds
+    });
+  } catch (err) {
+    console.error('[GET /cases/:id/surgeon-view]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/cases/:caseId/accept
+// Body: { surgeonId }
+// Surgeon accepts a case — updates assignment status to 'accepted',
+// updates case status to 'surgeon_confirmed', records responded_at.
+// ---------------------------------------------------------------------------
+router.patch('/cases/:caseId/accept', authMiddleware, async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { surgeonId } = req.body;
+
+    if (!surgeonId) return res.status(400).json({ error: 'surgeonId required in body' });
+
+    const now = new Date().toISOString();
+
+    // 1. Update the assignment record
+    const { data: assignment, error: aError } = await supabase
+      .from('case_assignments')
+      .update({ status: 'accepted', responded_at: now })
+      .eq('case_id', caseId)
+      .eq('surgeon_id', surgeonId)
+      .eq('status', 'pending_surgeon_response') // safety: only accept pending ones
+      .select()
+      .single();
+
+    if (aError) throw aError;
+    if (!assignment) {
+      return res.status(404).json({ error: 'No pending assignment found for this surgeon/case' });
+    }
+
+    // 2. Update the case status to surgeon_confirmed
+    const { error: cError } = await supabase
+      .from('cases')
+      .update({ status: 'surgeon_confirmed', updated_at: now })
+      .eq('id', caseId);
+
+    if (cError) throw cError;
+
+    // 3. Mark the surgeon as busy
+    await supabase
+      .from('surgeons')
+      .update({ availability_status: 'busy', updated_at: now })
+      .eq('id', surgeonId);
+
+    // 4. Cancel any other pending assignments for this same case
+    await supabase
+      .from('case_assignments')
+      .update({ status: 'cancelled', responded_at: now })
+      .eq('case_id', caseId)
+      .neq('surgeon_id', surgeonId)
+      .eq('status', 'pending_surgeon_response');
+
+    res.json({ message: 'Case accepted successfully', assignment });
+  } catch (err) {
+    console.error('[PATCH /cases/:id/accept]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/cases/:caseId/decline
+// Body: { surgeonId, reason? }
+// Surgeon declines — assignment becomes 'declined'.
+// The matching/cascade logic on the hospital side will handle next steps.
+// ---------------------------------------------------------------------------
+router.patch('/cases/:caseId/decline', authMiddleware, async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { surgeonId, reason } = req.body;
+
+    if (!surgeonId) return res.status(400).json({ error: 'surgeonId required in body' });
+
+    const now = new Date().toISOString();
+
+    const { data: assignment, error } = await supabase
+      .from('case_assignments')
+      .update({
+        status: 'declined',
+        responded_at: now,
+        decline_reason: reason || null
+      })
+      .eq('case_id', caseId)
+      .eq('surgeon_id', surgeonId)
+      .eq('status', 'pending_surgeon_response')
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!assignment) {
+      return res.status(404).json({ error: 'No pending assignment found' });
+    }
+
+    res.json({ message: 'Case declined', assignment });
+  } catch (err) {
+    console.error('[PATCH /cases/:id/decline]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;

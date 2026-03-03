@@ -1,0 +1,3 @@
+[2026-03-03 16:44:18] ERROR: Failed to fetch cases | {"error":"invalid input syntax for type uuid: \"PASTE_HOSPITAL_ID\""}
+[2026-03-03 16:44:18] ERROR: Error fetching cases | {"error":"invalid input syntax for type uuid: \"PASTE_HOSPITAL_ID\""}
+[2026-03-03 16:44:18] ERROR: ← GET /?hospital_id=PASTE_HOSPITAL_ID 500 (207ms) | {"response":{"message":"Failed to fetch cases"}}

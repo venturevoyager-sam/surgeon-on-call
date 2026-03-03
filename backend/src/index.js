@@ -33,6 +33,7 @@ const requestLogger = require('./middleware/requestLogger');
 // ── ROUTE IMPORTS ─────────────────────────────────────────────────────────────
 const casesRouter = require('./routes/cases');
 const surgeonsRouter = require('./routes/surgeons');
+const adminRouter = require('./routes/admin');
 
 // ── CONFIGURATION ─────────────────────────────────────────────────────────────
 const app = express();
@@ -71,9 +72,10 @@ app.get('/', async (req, res) => {
   }
 });
 
-//app.use('/api/cases', casesRouter);
+
 app.use('/api/surgeons', surgeonsRouter);
 app.use('/api/cases', casesRouter);
+app.use('/api/admin', adminRouter);
 
 // ── GLOBAL ERROR HANDLER ──────────────────────────────────────────────────────
 // Catches any unhandled errors thrown anywhere in the app

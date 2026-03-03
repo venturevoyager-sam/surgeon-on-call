@@ -362,7 +362,12 @@ export default function HomeScreen({ navigation }) {
           ) : (
             // Upcoming case cards
             upcomingCases.map((case_) => (
-              <View key={case_.id} style={styles.upcomingCard}>
+              <TouchableOpacity
+                key={case_.id}
+                style={styles.upcomingCard}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('AcceptedCase', { caseId: case_.id })}
+              >
                 {/* Date column */}
                 <View style={styles.upcomingDate}>
                   <Text style={styles.upcomingDateDay}>
@@ -382,8 +387,10 @@ export default function HomeScreen({ navigation }) {
                   <Text style={styles.upcomingFee}>
                     {formatFee(case_.fee_max)} confirmed
                   </Text>
+                  {/* View details link */}
+                  <Text style={styles.viewDetails}>View Details →</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>

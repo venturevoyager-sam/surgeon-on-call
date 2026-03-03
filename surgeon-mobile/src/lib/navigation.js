@@ -22,12 +22,14 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
 
+
 // ── SCREEN IMPORTS ─────────────────────────────────────────────────────────────
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import RequestDetailScreen from '../screens/RequestDetailScreen';
 import EarningsScreen from '../screens/EarningsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import AcceptedCaseScreen from '../screens/AcceptedCaseScreen';
 
 // ── NAVIGATORS ─────────────────────────────────────────────────────────────────
 // Stack navigator: screens slide in/out horizontally
@@ -148,12 +150,15 @@ export default function Navigation({ isLoggedIn, onLogin, onLogout }) {
             {/* Request detail screen — slides up when surgeon taps a request card */}
             {/* Sits outside the tab bar so it covers the full screen */}
             <Stack.Screen
-              name="RequestDetail"
-              component={RequestDetailScreen}
-              options={{
-                // Slide up from bottom like a modal
-                presentation: 'modal',
-              }}
+                name="RequestDetail"
+                component={RequestDetailScreen}
+                options={{ presentation: 'modal' }}
+            />
+
+            <Stack.Screen
+                name="AcceptedCase"
+                component={AcceptedCaseScreen}
+                options={{ presentation: 'modal' }}
             />
           </>
         ) : (

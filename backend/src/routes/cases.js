@@ -557,10 +557,12 @@ router.get('/:caseId/surgeon-view', async (req, res) => {
       return res.status(404).json({ message: 'Case not found' });
     }
 
-    // Fetch hospital city only (full address hidden until surgeon accepts)
+   // If case is confirmed, reveal full hospital name + city
+  // If still pending, only show city to protect privacy
+    const hospitalFields = case_.status === 'confirmed' ? 'id, name, city' : 'city';
     const { data: hospital } = await supabase
       .from('hospitals')
-      .select('city')
+      .select(hospitalFields)
       .eq('id', case_.hospital_id)
       .single();
 
@@ -582,8 +584,9 @@ router.get('/:caseId/surgeon-view', async (req, res) => {
     return res.json({
       case: {
         ...case_,
-        hospital_city: hospital?.city || null,
-        expires_at: expiresAt,
+        hospital_city:  hospital?.city || null,
+        hospital_name:  hospital?.name || null,  // only set when confirmed
+        expires_at:     expiresAt,
       }
     });
 
