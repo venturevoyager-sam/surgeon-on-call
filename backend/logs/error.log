@@ -1,3 +1,16 @@
 [2026-03-03 16:44:18] ERROR: Failed to fetch cases | {"error":"invalid input syntax for type uuid: \"PASTE_HOSPITAL_ID\""}
 [2026-03-03 16:44:18] ERROR: Error fetching cases | {"error":"invalid input syntax for type uuid: \"PASTE_HOSPITAL_ID\""}
 [2026-03-03 16:44:18] ERROR: ← GET /?hospital_id=PASTE_HOSPITAL_ID 500 (207ms) | {"response":{"message":"Failed to fetch cases"}}
+[2026-03-03 21:43:35] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:43:35] ERROR: ← POST /login 500 (1845ms) | {"response":{"message":"Failed to create account"}}
+[2026-03-03 21:44:25] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:44:25] ERROR: ← POST /login 500 (469ms) | {"response":{"message":"Failed to create account"}}
+[2026-03-03 21:48:14] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:48:14] ERROR: ← POST /login 500 (1210ms) | {"response":{"message":"Failed to create account"}}
+[2026-03-03 21:49:25] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:49:25] ERROR: ← POST /login 500 (500ms) | {"response":{"message":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}}
+[2026-03-03 21:50:48] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"city\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:50:48] ERROR: ← POST /login 500 (785ms) | {"response":{"message":"null value in column \"city\" of relation \"surgeons\" violates not-null constraint"}}
+[2026-03-03 21:52:15] ERROR: ← POST /login 401 (368ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-03 22:24:22] ERROR: ← POST /login 401 (304ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-03 22:24:26] ERROR: ← POST /login 401 (234ms) | {"response":{"message":"Incorrect password"}}

@@ -1,142 +1,94 @@
-// surgeon-on-call/surgeon-mobile/src/screens/LoginScreen.js
-//
-// LOGIN SCREEN — Surgeon authentication
-//
-// Flow:
-// 1. Surgeon enters their phone number
-// 2. App sends OTP via Supabase (SMS to their phone)
-// 3. Surgeon enters the 6-digit OTP
-// 4. App verifies OTP with Supabase
-// 5. On success → calls onLogin() → App.js switches to main tab bar
-//
-// DEV MODE: A "Skip Login" button appears at the bottom so we don't
-// have to go through OTP every time during development.
+/**
+ * surgeon-on-call/surgeon-mobile/src/screens/LoginScreen.js
+ *
+ * LOGIN SCREEN — Phone + password authentication
+ *
+ * Flow:
+ *   1. Surgeon enters 10-digit phone number + password
+ *   2. App calls POST /api/surgeons/login
+ *   3. If existing surgeon → password verified → logged in
+ *   4. If new surgeon → account auto-created → logged in
+ *   5. onLogin(surgeon) called → App.js saves session → main app shown
+ *
+ * DEV MODE: Quick login button shown at bottom for testing.
+ */
 
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Alert,
-  ScrollView,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
+import axios from 'axios';
 import CONFIG from '../lib/config';
 
-// ── DEV MODE ───────────────────────────────────────────────────────────────────
-// Set to true to show the "Skip Login" button during development
+// Set to false before going to production
 const DEV_MODE = true;
 
 export default function LoginScreen({ onLogin }) {
 
-  // ── STATE ──────────────────────────────────────────────────────────────────
+  const [phone, setPhone]       = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
 
-  // Which step we are on: 'phone' (enter number) or 'otp' (enter code)
-  const [step, setStep] = useState('phone');
-
-  // The phone number the surgeon types in
-  const [phone, setPhone] = useState('');
-
-  // The 6-digit OTP the surgeon types in
-  const [otp, setOtp] = useState('');
-
-  // Loading spinner while waiting for API response
-  const [loading, setLoading] = useState(false);
-
-  // Error message shown below the input
-  const [error, setError] = useState('');
-
-  // ── SEND OTP ───────────────────────────────────────────────────────────────
-  // Called when surgeon taps "Send OTP" button
-  // Sends a one-time password SMS to the surgeon's phone via Supabase
-  const handleSendOtp = async () => {
+  // ── HANDLE LOGIN ───────────────────────────────────────────────────────────
+  const handleLogin = async () => {
     setError('');
 
-    // Basic validation — phone number must be at least 10 digits
-    const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
+    // Validate phone
+    const cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
       setError('Please enter a valid 10-digit phone number');
       return;
     }
 
-    setLoading(true);
-    try {
-      // Format as Indian mobile number: +91XXXXXXXXXX
-      const formattedPhone = `+91${cleanPhone.slice(-10)}`;
-      console.log('Sending OTP to:', formattedPhone);
-
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-      });
-
-      if (error) throw error;
-
-      // OTP sent successfully — move to OTP entry step
-      console.log('OTP sent successfully');
-      setStep('otp');
-
-    } catch (err) {
-      console.error('Error sending OTP:', err.message);
-      setError(err.message || 'Failed to send OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── VERIFY OTP ─────────────────────────────────────────────────────────────
-  // Called when surgeon taps "Verify" button
-  // Checks the OTP with Supabase and logs the surgeon in
-  const handleVerifyOtp = async () => {
-    setError('');
-
-    // OTP must be exactly 6 digits
-    if (otp.length !== 6) {
-      setError('Please enter the 6-digit code');
+    // Validate password
+    if (password.length < 4) {
+      setError('Password must be at least 4 characters');
       return;
     }
 
     setLoading(true);
     try {
-      const cleanPhone = phone.replace(/\D/g, '');
-      const formattedPhone = `+91${cleanPhone.slice(-10)}`;
-      console.log('Verifying OTP for:', formattedPhone);
+      console.log('LoginScreen: Attempting login for phone:', cleanPhone);
 
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token: otp,
-        type: 'sms',
+      const response = await axios.post(
+        `${CONFIG.API_URL}/api/surgeons/login`,
+        { phone: cleanPhone, password },
+        { timeout: 10000 }
+      );
+
+      console.log('LoginScreen: Login successful:', response.data.name);
+
+      // Pass surgeon data up to App.js to save session
+      onLogin({
+        surgeon_id: response.data.surgeon_id,
+        name:       response.data.name,
+        phone:      response.data.phone,
       });
 
-      if (error) throw error;
-
-      // OTP verified — surgeon is now logged in
-      console.log('OTP verified, surgeon logged in:', data.user?.id);
-      onLogin(data.user);
-
     } catch (err) {
-      console.error('Error verifying OTP:', err.message);
-      setError(err.message || 'Invalid OTP. Please try again.');
+      const msg = err.response?.data?.message || 'Could not connect. Check your internet.';
+      console.error('LoginScreen: Login failed:', msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // ── DEV MODE SKIP LOGIN ────────────────────────────────────────────────────
-  // Bypasses the entire OTP flow and logs in as Dr. Arjun Mehta directly.
-  // Only visible when DEV_MODE = true.
-  const handleDevSkip = () => {
-    console.log('DEV MODE: Skipping login as Dr. Arjun Mehta');
-    onLogin({ id: CONFIG.DEV_SURGEON_ID, dev: true });
+  // ── DEV MODE QUICK LOGIN ───────────────────────────────────────────────────
+  // Logs in directly as Dr. Arjun Mehta without going through the API.
+  // Remove before production.
+  const handleDevLogin = () => {
+    console.log('DEV: Logging in as Dr. Arjun Mehta');
+    onLogin({
+      surgeon_id: CONFIG.DEV_SURGEON_ID,
+      name:       'Dr. Arjun Mehta',
+      phone:      '9999999999',
+    });
   };
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    // KeyboardAvoidingView: pushes the form up when the keyboard appears
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -145,109 +97,72 @@ export default function LoginScreen({ onLogin }) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-
-        {/* ── LOGO / HEADER ── */}
+        {/* ── HEADER ── */}
         <View style={styles.header}>
           <Text style={styles.logo}>🏥</Text>
           <Text style={styles.appName}>Surgeon on Call</Text>
           <Text style={styles.company}>Vaidhya Healthcare Pvt Ltd</Text>
-          <Text style={styles.tagline}>
-            {step === 'phone'
-              ? 'Enter your mobile number to continue'
-              : 'Enter the OTP sent to your phone'}
-          </Text>
+          <Text style={styles.tagline}>Sign in to your surgeon account</Text>
         </View>
 
         {/* ── FORM CARD ── */}
         <View style={styles.card}>
 
-          {step === 'phone' ? (
-            // ── STEP 1: PHONE NUMBER INPUT ──
-            <>
-              <Text style={styles.label}>Mobile Number</Text>
+          {/* Phone input */}
+          <Text style={styles.label}>Mobile Number</Text>
+          <View style={styles.phoneRow}>
+            <View style={styles.countryCode}>
+              <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
+            </View>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="10-digit mobile number"
+              placeholderTextColor="#94A3B8"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              maxLength={10}
+              autoFocus
+            />
+          </View>
 
-              {/* Phone number input with +91 prefix */}
-              <View style={styles.phoneRow}>
-                <View style={styles.countryCode}>
-                  <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
-                </View>
-                <TextInput
-                  style={styles.phoneInput}
-                  placeholder="10-digit mobile number"
-                  placeholderTextColor="#94A3B8"
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  autoFocus
-                />
-              </View>
+          {/* Password input */}
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Enter your password"
+            placeholderTextColor="#94A3B8"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+          />
 
-              {/* Error message */}
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+          {/* Error message */}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-              {/* Send OTP button */}
-              <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleSendOtp}
-                disabled={loading}
-              >
-                {loading
-                  ? <ActivityIndicator color="#FFFFFF" />
-                  : <Text style={styles.buttonText}>Send OTP →</Text>
-                }
-              </TouchableOpacity>
-            </>
-          ) : (
-            // ── STEP 2: OTP INPUT ──
-            <>
-              <Text style={styles.label}>Enter OTP</Text>
-              <Text style={styles.otpHint}>
-                Sent to +91 {phone.slice(-10)}
-              </Text>
+          {/* Login button */}
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading
+              ? <ActivityIndicator color="#FFFFFF" />
+              : <Text style={styles.buttonText}>Login →</Text>
+            }
+          </TouchableOpacity>
 
-              {/* OTP input */}
-              <TextInput
-                style={styles.otpInput}
-                placeholder="6-digit code"
-                placeholderTextColor="#94A3B8"
-                value={otp}
-                onChangeText={setOtp}
-                keyboardType="number-pad"
-                maxLength={6}
-                autoFocus
-              />
-
-              {/* Error message */}
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-
-              {/* Verify button */}
-              <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleVerifyOtp}
-                disabled={loading}
-              >
-                {loading
-                  ? <ActivityIndicator color="#FFFFFF" />
-                  : <Text style={styles.buttonText}>Verify & Login →</Text>
-                }
-              </TouchableOpacity>
-
-              {/* Go back to change phone number */}
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => { setStep('phone'); setOtp(''); setError(''); }}
-              >
-                <Text style={styles.backButtonText}>← Change number</Text>
-              </TouchableOpacity>
-            </>
-          )}
+          {/* New user hint */}
+          <Text style={styles.hint}>
+            New to the platform? Enter your phone and create a password to register automatically.
+          </Text>
         </View>
 
-        {/* ── DEV MODE SKIP BUTTON ── */}
-        {/* Only shown during development — remove before production */}
+        {/* ── DEV MODE BUTTON ── */}
         {DEV_MODE && (
-          <TouchableOpacity style={styles.devButton} onPress={handleDevSkip}>
+          <TouchableOpacity style={styles.devButton} onPress={handleDevLogin}>
             <Text style={styles.devButtonText}>
               🛠 DEV: Skip Login as Dr. Arjun Mehta
             </Text>
@@ -259,23 +174,16 @@ export default function LoginScreen({ onLogin }) {
   );
 }
 
-// ── STYLES ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-
-  // Full screen dark navy background
   container: {
     flex: 1,
     backgroundColor: '#0B1F3A',
   },
-
-  // Centers content vertically and horizontally
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
   },
-
-  // Logo + title section at the top
   header: {
     alignItems: 'center',
     marginBottom: 32,
@@ -301,8 +209,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: 'center',
   },
-
-  // White card that contains the form
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -313,7 +219,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-
   label: {
     fontSize: 13,
     fontWeight: '700',
@@ -322,12 +227,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
   },
-
-  // Row containing +91 prefix and phone input
   phoneRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   countryCode: {
     backgroundColor: '#F1F5F9',
@@ -353,42 +256,28 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     letterSpacing: 1,
   },
-
-  // Hint text below OTP label
-  otpHint: {
-    fontSize: 13,
-    color: '#94A3B8',
-    marginBottom: 12,
-  },
-
-  // Large OTP input — centered text, big font
-  otpInput: {
+  passwordInput: {
     backgroundColor: '#F8FAFC',
     borderRadius: 10,
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 28,
+    paddingVertical: 14,
+    fontSize: 16,
     color: '#1E293B',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    textAlign: 'center',
-    letterSpacing: 8,
     marginBottom: 16,
   },
-
-  // Red error message
   error: {
     color: '#EF4444',
     fontSize: 13,
     marginBottom: 12,
   },
-
-  // Primary action button (blue)
   button: {
     backgroundColor: '#1A56A0',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+    marginBottom: 16,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -398,18 +287,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-
-  // "Change number" back link
-  backButton: {
-    alignItems: 'center',
-    marginTop: 16,
+  hint: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
   },
-  backButtonText: {
-    color: '#64748B',
-    fontSize: 14,
-  },
-
-  // DEV MODE skip button at the bottom
   devButton: {
     marginTop: 24,
     backgroundColor: '#1E3A5F',

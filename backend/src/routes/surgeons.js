@@ -45,15 +45,22 @@ router.get('/:id', async (req, res) => {
         id,
         name,
         phone,
+        email,
         specialty,
         mci_number,
+        experience_years,
+        city,
+        bio,
         verified,
         available,
-        city,
         rating,
         total_cases,
-        experience_years,
-        status
+        status,
+        ug_college,
+        pg_college,
+        profile_photo_url,
+        certificate_url,
+        created_at
       `)
       .eq('id', id)
       .single();
@@ -464,5 +471,247 @@ async function triggerCascade(caseId) {
     logger.error('Error in cascade', { error: error.message });
   }
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/surgeons/:id/profile
+// Updates surgeon profile details.
+// Called by: ProfileScreen — Personal and Credentials tabs
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:id/profile', async (req, res) => {
+  const { id } = req.params;
+  const {
+    name, city, bio, experience_years,
+    specialty, mci_number, ug_college, pg_college,
+    profile_photo_url, certificate_url,
+  } = req.body;
+
+  logger.info('Updating surgeon profile', { surgeon_id: id });
+
+  try {
+    // Build update object — only include fields that were actually sent
+    const updates = {};
+    if (name             !== undefined) updates.name             = name;
+    if (city             !== undefined) updates.city             = city;
+    if (bio              !== undefined) updates.bio              = bio;
+    if (experience_years !== undefined) updates.experience_years = experience_years;
+    if (specialty        !== undefined) updates.specialty        = specialty;
+    if (mci_number       !== undefined) updates.mci_number       = mci_number;
+    if (ug_college       !== undefined) updates.ug_college       = ug_college;
+    if (pg_college       !== undefined) updates.pg_college       = pg_college;
+    if (profile_photo_url !== undefined) updates.profile_photo_url = profile_photo_url;
+    if (certificate_url  !== undefined) updates.certificate_url  = certificate_url;
+    updates.updated_at = new Date().toISOString();
+
+    const { data: surgeon, error } = await supabase
+      .from('surgeons')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Failed to update surgeon profile', { error: error.message });
+      throw error;
+    }
+
+    logger.info('Surgeon profile updated', { surgeon_id: id });
+    return res.json({ message: 'Profile updated successfully', surgeon });
+
+  } catch (error) {
+    logger.error('Error updating surgeon profile', { error: error.message });
+    return res.status(500).json({ message: 'Failed to update profile' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/surgeons/:id/password
+// Updates surgeon password.
+// Requires current password for verification before allowing change.
+// Called by: ProfileScreen — change password flow
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:id/password', async (req, res) => {
+  const { id } = req.params;
+  const { current_password, new_password } = req.body;
+
+  logger.info('Password change requested', { surgeon_id: id });
+
+  if (!current_password || !new_password) {
+    return res.status(400).json({ message: 'Current and new password are required' });
+  }
+
+  if (new_password.length < 4) {
+    return res.status(400).json({ message: 'New password must be at least 4 characters' });
+  }
+
+  try {
+    const bcrypt = require('bcryptjs');
+
+    // Fetch auth record for this surgeon
+    const { data: authRecord, error: fetchError } = await supabase
+      .from('surgeon_auth')
+      .select('id, password_hash')
+      .eq('surgeon_id', id)
+      .single();
+
+    if (fetchError || !authRecord) {
+      return res.status(404).json({ message: 'Auth record not found' });
+    }
+
+    // Verify current password
+    const passwordMatch = await bcrypt.compare(current_password, authRecord.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    // Hash new password and save
+    const newHash = await bcrypt.hash(new_password, 10);
+    const { error: updateError } = await supabase
+      .from('surgeon_auth')
+      .update({ password_hash: newHash })
+      .eq('id', authRecord.id);
+
+    if (updateError) {
+      logger.error('Failed to update password', { error: updateError.message });
+      return res.status(500).json({ message: 'Failed to update password' });
+    }
+
+    logger.info('Password updated successfully', { surgeon_id: id });
+    return res.json({ message: 'Password updated successfully' });
+
+  } catch (error) {
+    logger.error('Error changing password', { error: error.message });
+    return res.status(500).json({ message: 'Something went wrong' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/surgeons/login
+// Phone + password login for the surgeon mobile app.
+//
+// Flow:
+//   1. Check if phone exists in surgeon_auth table
+//   2. If found → verify password using bcrypt
+//   3. If not found → auto-create surgeon + auth record
+//   4. Return surgeon_id, name, phone on success
+//
+// Called by: LoginScreen
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/login', async (req, res) => {
+  const { phone, password } = req.body;
+
+  logger.info('Surgeon login attempt', { phone });
+
+  // ── Validate inputs ────────────────────────────────────────────────────────
+  if (!phone || !password) {
+    return res.status(400).json({ message: 'Phone and password are required' });
+  }
+
+  // Clean phone — strip everything except digits, keep last 10
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  if (cleanPhone.length !== 10) {
+    return res.status(400).json({ message: 'Enter a valid 10-digit phone number' });
+  }
+
+  try {
+    const bcrypt = require('bcryptjs');
+
+    // ── Check if surgeon already has an auth record ────────────────────────
+    const { data: authRecord, error: authError } = await supabase
+      .from('surgeon_auth')
+      .select('*, surgeons(id, name, phone, specialty, verified, available)')
+      .eq('phone', cleanPhone)
+      .single();
+
+    if (authRecord) {
+      // ── EXISTING SURGEON: verify password ─────────────────────────────────
+      const passwordMatch = await bcrypt.compare(password, authRecord.password_hash);
+
+      if (!passwordMatch) {
+        logger.warn('Surgeon login: wrong password', { phone: cleanPhone });
+        return res.status(401).json({ message: 'Incorrect password' });
+      }
+
+      logger.info('Surgeon login: success', {
+        surgeon_id: authRecord.surgeon_id,
+        name: authRecord.surgeons?.name,
+      });
+
+      return res.json({
+        message: 'Login successful',
+        surgeon_id: authRecord.surgeon_id,
+        name:       authRecord.surgeons?.name,
+        phone:      cleanPhone,
+        verified:   authRecord.surgeons?.verified,
+        available:  authRecord.surgeons?.available,
+      });
+
+    } else {
+      // ── NEW SURGEON: auto-register ─────────────────────────────────────────
+      logger.info('Surgeon login: new surgeon, auto-registering', { phone: cleanPhone });
+
+      // Hash the password before storing
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Create surgeon record
+      const { data: newSurgeon, error: surgeonCreateError } = await supabase
+        .from('surgeons')
+        .insert({
+          name:             `Dr. (${cleanPhone})`,  // Placeholder name until profile is set up
+          phone:            cleanPhone,
+          specialty:        [],
+          verified:         false,   // Admin must verify new surgeons
+          available:        false,   // Not available until verified
+          rating:           0,
+          total_cases:      0,
+          experience_years: 0,
+          mci_number:       'PENDING',
+          city:             'Not set',
+          bio:              '',
+
+        })
+        .select()
+        .single();
+
+      if (surgeonCreateError) {
+        logger.error('Surgeon login: failed to create surgeon', { error: surgeonCreateError.message });
+        return res.status(500).json({  message: surgeonCreateError.message  });
+      }
+
+      // Create auth record
+      const { error: authCreateError } = await supabase
+        .from('surgeon_auth')
+        .insert({
+          surgeon_id:    newSurgeon.id,
+          phone:         cleanPhone,
+          password_hash: passwordHash,
+        });
+
+      if (authCreateError) {
+        logger.error('Surgeon login: failed to create auth record', { error: authCreateError.message });
+        return res.status(500).json({ message: 'Failed to create account' });
+      }
+
+      logger.info('Surgeon login: new surgeon registered', {
+        surgeon_id: newSurgeon.id,
+        phone:      cleanPhone,
+      });
+
+      return res.status(201).json({
+        message:   'Account created successfully',
+        surgeon_id: newSurgeon.id,
+        name:       newSurgeon.name,
+        phone:      cleanPhone,
+        verified:   false,
+        available:  false,
+      });
+    }
+
+  } catch (error) {
+    logger.error('Surgeon login: unexpected error', { error: error.message });
+    return res.status(500).json({ message: 'Something went wrong' });
+  }
+});
+
 
 module.exports = router;

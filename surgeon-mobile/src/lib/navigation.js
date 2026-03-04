@@ -58,7 +58,7 @@ function TabIcon({ emoji, focused }) {
 // ── MAIN TABS ──────────────────────────────────────────────────────────────────
 // The bottom tab bar shown when the surgeon is logged in.
 // Contains: Home, Earnings, Profile
-function MainTabs({ onLogout }) {
+function MainTabs({ surgeonId, onLogout }) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -92,13 +92,11 @@ function MainTabs({ onLogout }) {
     >
       {/* ── HOME TAB ── */}
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
-        }}
-      />
+          name="Home"
+          options={{ tabBarLabel: 'Home', tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} /> }}
+        >
+          {(props) => <HomeScreen {...props} surgeonId={surgeonId} />}
+      </Tab.Screen>
 
       {/* ── EARNINGS TAB ── */}
       <Tab.Screen
@@ -119,7 +117,7 @@ function MainTabs({ onLogout }) {
         }}
       >
         {/* Pass onLogout down to ProfileScreen so surgeon can log out */}
-        {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
+        {(props) => <ProfileScreen {...props} surgeonId={surgeonId} onLogout={onLogout} />}
       </Tab.Screen>
 
     </Tab.Navigator>
@@ -132,7 +130,7 @@ function MainTabs({ onLogout }) {
 //   isLoggedIn — boolean, controls which stack is shown
 //   onLogin    — function, called when surgeon logs in successfully
 //   onLogout   — function, called when surgeon logs out
-export default function Navigation({ isLoggedIn, onLogin, onLogout }) {
+export default function Navigation({ isLoggedIn, surgeonId, onLogin, onLogout }) {
   return (
     // NavigationContainer: wraps the entire navigation tree
     // Must be at the root of all navigation
@@ -144,7 +142,7 @@ export default function Navigation({ isLoggedIn, onLogin, onLogout }) {
           <>
             {/* Main tab bar — Home, Earnings, Profile */}
             <Stack.Screen name="MainTabs">
-              {(props) => <MainTabs {...props} onLogout={onLogout} />}
+              {(props) => <MainTabs {...props} surgeonId={surgeonId} onLogout={onLogout} />}
             </Stack.Screen>
 
             {/* Request detail screen — slides up when surgeon taps a request card */}

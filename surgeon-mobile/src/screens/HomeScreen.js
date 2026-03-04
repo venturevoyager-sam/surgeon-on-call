@@ -26,7 +26,9 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
+
 import axios from 'axios';
 import CONFIG from '../lib/config';
 
@@ -34,7 +36,7 @@ import CONFIG from '../lib/config';
 // When true, uses the hardcoded test surgeon ID instead of a real logged-in user
 const DEV_MODE = true;
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, surgeonId }) {
 
   // ── STATE ──────────────────────────────────────────────────────────────────
 
@@ -63,7 +65,7 @@ export default function HomeScreen({ navigation }) {
   // ── GET SURGEON ID ─────────────────────────────────────────────────────────
   // In DEV_MODE, use the hardcoded test surgeon ID.
   // In production, this would come from Supabase auth session.
-  const surgeonId = CONFIG.DEV_SURGEON_ID;
+  // const surgeonId = CONFIG.DEV_SURGEON_ID;
 
   // ── FETCH DATA ─────────────────────────────────────────────────────────────
   // Fetches surgeon profile and their incoming/upcoming cases from the backend.
@@ -201,14 +203,20 @@ export default function HomeScreen({ navigation }) {
 
           {/* Surgeon avatar (initials) + name + specialty */}
           <View style={styles.surgeonInfo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {/* Show initials from surgeon name e.g. "AM" for Arjun Mehta */}
-                {surgeon?.name
-                  ? surgeon.name.split(' ').slice(-2).map(n => n[0]).join('')
-                  : 'DR'}
-              </Text>
-            </View>
+            {surgeon?.profile_photo_url ? (
+              <Image
+                source={{ uri: surgeon.profile_photo_url }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {surgeon?.name
+                    ? surgeon.name.split(' ').slice(-2).map(n => n[0]).join('')
+                    : 'DR'}
+                </Text>
+              </View>
+            )}
             <View>
               <Text style={styles.greeting}>Good morning 👋</Text>
               <Text style={styles.surgeonName}>
