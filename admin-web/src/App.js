@@ -2,32 +2,28 @@
  * ADMIN DASHBOARD - Surgeon on Call
  * Company: Vaidhya Healthcare Pvt Ltd
  *
- * Single-page admin dashboard for the Vaidhya operations team.
+ * Full admin control panel for the Vaidhya operations team.
  *
- * Features:
- * - Platform stats: total cases, fill rate, active surgeons, revenue
- * - All cases across all hospitals with status badges
- * - Manual override: assign any verified surgeon to any active case
- * - All surgeons with availability status
- * - Hospital-wise breakdown
+ * Tabs:
+ * 1. Overview    — platform stats at a glance
+ * 2. Cases       — all cases, filters, mark complete/cancel, reassign, cascade
+ * 3. Surgeons    — all surgeons, verify/reject, suspend/reactivate
+ * 4. Earnings    — commission report
  *
- * DEV_MODE=true — no login required during development
- * Run on port 3001 (hospital web runs on 3000)
+ * Runs on port 3001 (hospital web is on 3000)
+ * DEV_MODE = true — no login required during development
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const DEV_MODE = true;
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-
 const formatDate = (d) => {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric'
-  });
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
 const formatFee = (paise) => {
@@ -35,9 +31,10 @@ const formatFee = (paise) => {
   return '₹' + (paise / 100).toLocaleString('en-IN');
 };
 
-// Status badge styles — consistent across tables
-const STATUS_STYLES = {
-  active:      { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Draft' },
+// Status badge config for cases
+const CASE_STATUS = {
+  draft:       { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Draft' },
+  active:      { bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'Active' },
   cascading:   { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'Cascading' },
   confirmed:   { bg: 'bg-green-100',  text: 'text-green-700',  label: 'Confirmed' },
   in_progress: { bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'In Progress' },
@@ -46,658 +43,657 @@ const STATUS_STYLES = {
   unfilled:    { bg: 'bg-red-100',    text: 'text-red-600',    label: 'Unfilled' },
 };
 
-function StatusBadge({ status }) {
-  const s = STATUS_STYLES[status] || STATUS_STYLES.active;
-  return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${s.bg} ${s.text}`}>
-      {s.label}
-    </span>
-  );
-}
+// ── ROOT COMPONENT ────────────────────────────────────────────────────────────
+export default function App() {
+  const [activeTab, setActiveTab] = useState('overview');
 
-// ── OVERRIDE MODAL ────────────────────────────────────────────────────────────
-/**
- * Modal for admin to manually assign any verified surgeon to a case.
- * Fetches all verified surgeons, lets admin pick one, confirms assignment.
- * On confirm: stops cascade, marks all others cancelled, sets confirmed surgeon.
- */
-function OverrideModal({ case_, onClose, onSuccess }) {
-  const [surgeons, setSurgeons] = useState([]);
-  const [selectedSurgeon, setSelectedSurgeon] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-
-  // Fetch all verified surgeons on mount
-  useEffect(() => {
-    const fetchSurgeons = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/admin/surgeons`);
-        const data = await res.json();
-        setSurgeons(data.surgeons || []);
-      } catch (err) {
-        setError('Failed to load surgeons');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSurgeons();
-  }, []);
-
-  // Filter surgeons by search
-  const filtered = surgeons.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    (Array.isArray(s.specialty) ? s.specialty.join(' ') : s.specialty || '').toLowerCase().includes(search.toLowerCase()) ||
-    s.city.toLowerCase().includes(search.toLowerCase())
-  );
-
-  // Confirm override
-  const handleConfirm = async () => {
-    if (!selectedSurgeon) return;
-    setSaving(true);
-    setError('');
-    try {
-      const res = await fetch(`${API_URL}/api/admin/cases/${case_.id}/override`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ surgeon_id: selectedSurgeon.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Override failed');
-      onSuccess();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    // Modal backdrop
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Manual Override</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Assign a surgeon to <strong>SOC-{String(case_.case_number).padStart(3,'0')}</strong> — {case_.procedure}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none mt-0.5">×</button>
-        </div>
-
-        {/* Warning banner */}
-        <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-xs text-amber-700">
-            ⚠️ This will <strong>stop the cascade</strong> and mark all other surgeons as cancelled.
-            The selected surgeon will be immediately confirmed.
-          </p>
-        </div>
-
-        {/* Search */}
-        <div className="px-6 mt-4">
-          <input
-            type="text"
-            placeholder="Search by name, specialty, or city..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Surgeon list */}
-        <div className="flex-1 overflow-y-auto px-6 mt-3 pb-2">
-          {loading ? (
-            <p className="text-gray-400 text-sm text-center py-8">Loading surgeons...</p>
-          ) : filtered.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-8">No surgeons found</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {filtered.map(surgeon => (
-                <div
-                  key={surgeon.id}
-                  onClick={() => setSelectedSurgeon(surgeon)}
-                  className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition
-                    ${selectedSurgeon?.id === surgeon.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-100 hover:border-blue-200'
-                    }`}
-                >
-                  {/* Avatar */}
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center
-                    text-white font-bold text-sm flex-shrink-0
-                    ${selectedSurgeon?.id === surgeon.id ? 'bg-blue-600' : 'bg-gray-400'}`}>
-                    {surgeon.name.split(' ').slice(-2).map(n => n[0]).join('')}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm text-gray-800">{surgeon.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5 truncate">
-                      {Array.isArray(surgeon.specialty) ? surgeon.specialty.join(', ') : surgeon.specialty}
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-xs text-gray-500">⭐ {surgeon.rating} · {surgeon.city}</div>
-                    <div className={`text-xs mt-0.5 font-medium ${surgeon.available ? 'text-green-600' : 'text-red-500'}`}>
-                      {surgeon.available ? '● Available' : '● Unavailable'}
-                    </div>
-                  </div>
-
-                  {/* Selected indicator */}
-                  {selectedSurgeon?.id === surgeon.id && (
-                    <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Error */}
-        {error && (
-          <p className="px-6 text-red-500 text-sm">{error}</p>
-        )}
-
-        {/* Footer buttons */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!selectedSurgeon || saving}
-            className="flex-1 px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {saving
-              ? 'Assigning...'
-              : selectedSurgeon
-                ? `Assign ${selectedSurgeon.name.split(' ').slice(-1)[0]}`
-                : 'Select a Surgeon'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── STATS TAB ─────────────────────────────────────────────────────────────────
-function StatsTab({ cases, surgeons, hospitals }) {
-  // Compute platform stats from data
-  const totalCases = cases.length;
-  const activeCases = cases.filter(c => ['active','cascading','confirmed','in_progress'].includes(c.status)).length;
-  const completedCases = cases.filter(c => c.status === 'completed').length;
-  const unfilledCases = cases.filter(c => c.status === 'unfilled').length;
-  const fillRate = totalCases > 0
-    ? Math.round((completedCases + cases.filter(c => c.status === 'confirmed').length) / totalCases * 100)
-    : 0;
-  const availableSurgeons = surgeons.filter(s => s.available).length;
-
-  const statCards = [
-    { label: 'Total Cases',        value: totalCases,          color: 'text-blue-900' },
-    { label: 'Active Cases',       value: activeCases,         color: 'text-amber-600' },
-    { label: 'Completed',          value: completedCases,      color: 'text-teal-600' },
-    { label: 'Unfilled',           value: unfilledCases,       color: 'text-red-500' },
-    { label: 'Fill Rate',          value: fillRate + '%',      color: 'text-green-600' },
-    { label: 'Total Surgeons',     value: surgeons.length,     color: 'text-blue-900' },
-    { label: 'Available Now',      value: availableSurgeons,   color: 'text-green-600' },
-    { label: 'Hospitals',          value: hospitals.length,    color: 'text-blue-900' },
-  ];
-
-  // Hospital-wise case breakdown
-  const hospitalBreakdown = hospitals.map(h => {
-    const hCases = cases.filter(c => c.hospital_id === h.id);
-    return {
-      ...h,
-      total: hCases.length,
-      active: hCases.filter(c => ['active','cascading','confirmed','in_progress'].includes(c.status)).length,
-      completed: hCases.filter(c => c.status === 'completed').length,
-      unfilled: hCases.filter(c => c.status === 'unfilled').length,
-    };
-  }).sort((a, b) => b.total - a.total);
-
-  return (
-    <div>
-      {/* Stats grid */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        {statCards.map(card => (
-          <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className={`text-3xl font-bold ${card.color}`}>{card.value}</div>
-            <div className="text-gray-500 text-sm mt-1">{card.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Hospital breakdown */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-800">Hospital-wise Breakdown</h3>
-        </div>
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Hospital</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">City</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Active</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Completed</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Unfilled</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {hospitalBreakdown.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400 text-sm">No hospitals yet</td></tr>
-            ) : hospitalBreakdown.map(h => (
-              <tr key={h.id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4">
-                  <div className="font-medium text-sm text-gray-800">{h.name}</div>
-                  <div className="text-xs text-gray-400">{h.contact_email}</div>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{h.city}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-blue-900">{h.total}</td>
-                <td className="px-6 py-4 text-sm text-amber-600">{h.active}</td>
-                <td className="px-6 py-4 text-sm text-teal-600">{h.completed}</td>
-                <td className="px-6 py-4 text-sm text-red-500">{h.unfilled}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ── CASES TAB ─────────────────────────────────────────────────────────────────
-function CasesTab({ cases, hospitals, onOverride }) {
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
-
-  // Build hospital lookup map for displaying hospital name
-  const hospitalMap = {};
-  hospitals.forEach(h => { hospitalMap[h.id] = h; });
-
-  // Filter cases
-  const filtered = cases.filter(c => {
-    const matchesStatus = filter === 'all' || c.status === filter;
-    const matchesSearch = !search ||
-      c.procedure.toLowerCase().includes(search.toLowerCase()) ||
-      String(c.case_number).includes(search) ||
-      (hospitalMap[c.hospital_id]?.name || '').toLowerCase().includes(search.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
-
-  // Cases that can be overridden (active, cascading, or unfilled)
-  const canOverride = (status) => ['active', 'cascading', 'unfilled'].includes(status);
-
-  return (
-    <div>
-      {/* Filters row */}
-      <div className="flex gap-3 mb-5 flex-wrap">
-        <input
-          type="text"
-          placeholder="Search procedure, case ID, hospital..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="flex-1 min-w-48 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
-        {['all', 'active', 'cascading', 'confirmed', 'completed', 'unfilled'].map(s => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`px-3 py-2 rounded-lg text-xs font-semibold transition capitalize
-              ${filter === s ? 'bg-blue-700 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}
-          >
-            {s === 'all' ? 'All' : STATUS_STYLES[s]?.label || s}
-          </button>
-        ))}
-      </div>
-
-      {/* Cases table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Case</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Hospital</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Surgery Date</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fee</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {filtered.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400 text-sm">No cases found</td></tr>
-            ) : filtered.map(c => (
-              <tr key={c.id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4">
-                  <div className="font-mono text-xs text-gray-400">SOC-{String(c.case_number).padStart(3,'0')}</div>
-                  <div className="font-medium text-sm text-gray-800 mt-0.5">{c.procedure}</div>
-                  <div className="text-xs text-gray-400">{c.specialty_required}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-700">{hospitalMap[c.hospital_id]?.name || '—'}</div>
-                  <div className="text-xs text-gray-400">{hospitalMap[c.hospital_id]?.city || ''}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-600">{formatDate(c.surgery_date)}</div>
-                  <div className="text-xs text-gray-400">{c.surgery_time}</div>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {formatFee(c.fee_min)} – {formatFee(c.fee_max)}
-                </td>
-                <td className="px-6 py-4">
-                  <StatusBadge status={c.status} />
-                </td>
-                <td className="px-6 py-4">
-                  {canOverride(c.status) && (
-                    <button
-                      onClick={() => onOverride(c)}
-                      className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
-                    >
-                      Override
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ── SURGEONS TAB ──────────────────────────────────────────────────────────────
-function SurgeonsTab({ surgeons }) {
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
-
-  const filtered = surgeons.filter(s => {
-    const matchesSearch = !search ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      (Array.isArray(s.specialty) ? s.specialty.join(' ') : s.specialty || '').toLowerCase().includes(search.toLowerCase()) ||
-      s.city.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter =
-      filter === 'all' ||
-      (filter === 'available' && s.available) ||
-      (filter === 'unavailable' && !s.available);
-    return matchesSearch && matchesFilter;
-  });
-
-  return (
-    <div>
-      {/* Filters */}
-      <div className="flex gap-3 mb-5">
-        <input
-          type="text"
-          placeholder="Search name, specialty, city..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
-        {['all', 'available', 'unavailable'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-2 rounded-lg text-xs font-semibold transition capitalize
-              ${filter === f ? 'bg-blue-700 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}
-          >
-            {f === 'all' ? 'All' : f === 'available' ? '● Available' : '● Unavailable'}
-          </button>
-        ))}
-      </div>
-
-      {/* Surgeons table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Surgeon</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Specialty</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">City</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Rating</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cases</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {filtered.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400 text-sm">No surgeons found</td></tr>
-            ) : filtered.map(s => (
-              <tr key={s.id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-blue-900 flex items-center justify-center
-                      text-white text-xs font-bold flex-shrink-0">
-                      {s.name.split(' ').slice(-2).map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                      <div className="font-medium text-sm text-gray-800">{s.name}</div>
-                      <div className="text-xs text-gray-400">MCI: {s.mci_number || '—'}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-xs text-gray-600">
-                  {Array.isArray(s.specialty) ? s.specialty.join(', ') : s.specialty || '—'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{s.city}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">⭐ {s.rating || 'New'}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{s.total_cases || 0}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold
-                    ${s.available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {s.available ? '● Available' : '● Offline'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ── HOSPITALS TAB ─────────────────────────────────────────────────────────────
-function HospitalsTab({ hospitals, cases }) {
-  // Count cases per hospital
-  const caseCount = {};
-  cases.forEach(c => {
-    caseCount[c.hospital_id] = (caseCount[c.hospital_id] || 0) + 1;
-  });
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-gray-50 border-b border-gray-100">
-          <tr>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Hospital</th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">City</th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Cases</th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Verified</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {hospitals.length === 0 ? (
-            <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400 text-sm">No hospitals yet</td></tr>
-          ) : hospitals.map(h => (
-            <tr key={h.id} className="hover:bg-gray-50 transition">
-              <td className="px-6 py-4">
-                <div className="font-medium text-sm text-gray-800">{h.name}</div>
-              </td>
-              <td className="px-6 py-4 text-sm text-gray-600">{h.city}</td>
-              <td className="px-6 py-4 text-sm text-gray-600">{h.contact_email}</td>
-              <td className="px-6 py-4 text-sm font-semibold text-blue-900">{caseCount[h.id] || 0}</td>
-              <td className="px-6 py-4">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold
-                  ${h.verified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {h.verified ? '✓ Verified' : 'Pending'}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ── MAIN APP ──────────────────────────────────────────────────────────────────
-export default function AdminApp() {
-  // ── STATE ──────────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState('stats');
-  const [cases, setCases] = useState([]);
-  const [surgeons, setSurgeons] = useState([]);
-  const [hospitals, setHospitals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [overrideCase, setOverrideCase] = useState(null); // case being overridden
-
-  // ── FETCH ALL DATA ─────────────────────────────────────────────────────────
-  const fetchAll = useCallback(async () => {
-    try {
-      const [casesRes, surgeonsRes, hospitalsRes] = await Promise.all([
-        fetch(`${API_URL}/api/admin/cases`),
-        fetch(`${API_URL}/api/admin/surgeons`),
-        fetch(`${API_URL}/api/admin/hospitals`),
-      ]);
-
-      const [casesData, surgeonsData, hospitalsData] = await Promise.all([
-        casesRes.json(),
-        surgeonsRes.json(),
-        hospitalsRes.json(),
-      ]);
-
-      setCases(casesData.cases || []);
-      setSurgeons(surgeonsData.surgeons || []);
-      setHospitals(hospitalsData.hospitals || []);
-    } catch (err) {
-      setError('Failed to load data. Is the backend running?');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
-  // ── TABS ───────────────────────────────────────────────────────────────────
   const tabs = [
-    { id: 'stats',     label: '📊 Stats' },
-    { id: 'cases',     label: `🏥 Cases (${cases.length})` },
-    { id: 'surgeons',  label: `👨‍⚕️ Surgeons (${surgeons.length})` },
-    { id: 'hospitals', label: `🏨 Hospitals (${hospitals.length})` },
+    { id: 'overview', label: '📊 Overview' },
+    { id: 'cases',    label: '🏥 Cases' },
+    { id: 'surgeons', label: '👨‍⚕️ Surgeons' },
+    { id: 'earnings', label: '💰 Earnings' },
   ];
-
-  // ── RENDER ─────────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-400">Loading admin dashboard...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* Override modal */}
-      {overrideCase && (
-        <OverrideModal
-          case_={overrideCase}
-          onClose={() => setOverrideCase(null)}
-          onSuccess={() => {
-            setOverrideCase(null);
-            fetchAll(); // Refresh all data after override
-          }}
-        />
-      )}
-
-      {/* ── TOP NAV ── */}
+      {/* ── NAV ── */}
       <nav className="bg-blue-900 px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div>
           <h1 className="text-white font-bold text-xl">
             Surgeon <span className="text-blue-300">on Call</span>
+            <span className="ml-3 text-xs bg-blue-700 text-blue-200 px-2 py-1 rounded-full font-normal">Admin</span>
           </h1>
-          <span className="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded">
-            ADMIN
-          </span>
+          <p className="text-blue-400 text-xs mt-0.5">Vaidhya Healthcare Pvt Ltd</p>
         </div>
-        <div className="flex items-center gap-3">
-          {DEV_MODE && (
-            <span className="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded">
-              DEV MODE
-            </span>
-          )}
-          <span className="text-blue-300 text-sm">Vaidhya Healthcare Pvt Ltd</span>
-        </div>
+        <div className="text-blue-300 text-sm">Operations Dashboard</div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-
-        {/* Error */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            ❌ {error}
-          </div>
-        )}
-
-        {/* ── TABS ── */}
-        <div className="flex gap-1 mb-6 border-b border-gray-200">
+      {/* ── TABS ── */}
+      <div className="bg-white border-b border-gray-200 px-8">
+        <div className="flex gap-1">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-5 py-3 text-sm font-semibold border-b-2 transition
-                ${activeTab === tab.id
+              className={`px-5 py-4 text-sm font-semibold border-b-2 transition ${
+                activeTab === tab.id
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+              }`}
             >
               {tab.label}
             </button>
           ))}
-
-          {/* Refresh button */}
-          <button
-            onClick={fetchAll}
-            className="ml-auto px-4 py-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            ↻ Refresh
-          </button>
         </div>
+      </div>
 
-        {/* ── TAB CONTENT ── */}
-        {activeTab === 'stats' && (
-          <StatsTab cases={cases} surgeons={surgeons} hospitals={hospitals} />
-        )}
-        {activeTab === 'cases' && (
-          <CasesTab
-            cases={cases}
-            hospitals={hospitals}
-            onOverride={(case_) => setOverrideCase(case_)}
-          />
-        )}
-        {activeTab === 'surgeons' && (
-          <SurgeonsTab surgeons={surgeons} />
-        )}
-        {activeTab === 'hospitals' && (
-          <HospitalsTab hospitals={hospitals} cases={cases} />
+      {/* ── TAB CONTENT ── */}
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        {activeTab === 'overview' && <OverviewTab />}
+        {activeTab === 'cases'    && <CasesTab />}
+        {activeTab === 'surgeons' && <SurgeonsTab />}
+        {activeTab === 'earnings' && <EarningsTab />}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OVERVIEW TAB
+// Shows platform-wide stats at a glance
+// ══════════════════════════════════════════════════════════════════════════════
+function OverviewTab() {
+  const [stats, setStats]   = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [casesRes, surgeonsRes, earningsRes] = await Promise.all([
+          axios.get(`${API_URL}/api/admin/cases`),
+          axios.get(`${API_URL}/api/admin/surgeons`),
+          axios.get(`${API_URL}/api/admin/earnings`),
+        ]);
+
+        const cases    = casesRes.data.cases    || [];
+        const surgeons = surgeonsRes.data.surgeons || [];
+        const summary  = earningsRes.data.summary  || {};
+
+        setStats({
+          total_cases:       cases.length,
+          active_cases:      cases.filter(c => ['active', 'cascading'].includes(c.status)).length,
+          confirmed_cases:   cases.filter(c => c.status === 'confirmed').length,
+          completed_cases:   cases.filter(c => c.status === 'completed').length,
+          unfilled_cases:    cases.filter(c => c.status === 'unfilled').length,
+          total_surgeons:    surgeons.length,
+          verified_surgeons: surgeons.filter(s => s.verified && s.status === 'active').length,
+          pending_surgeons:  surgeons.filter(s => !s.verified && s.status !== 'suspended').length,
+          total_commission:  summary.total_commission || 0,
+          fill_rate: cases.length > 0
+            ? Math.round((cases.filter(c => ['confirmed','completed'].includes(c.status)).length / cases.length) * 100)
+            : 0,
+        });
+      } catch (err) {
+        console.error('Overview fetch failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  if (loading) return <Spinner />;
+  if (!stats) return (
+    <div className="text-center py-16 text-gray-400">
+      Failed to load stats. Make sure the backend is running.
+    </div>
+  );
+
+  const statCards = [
+    { label: 'Total Cases',        value: stats.total_cases,       color: 'text-blue-900' },
+    { label: 'Active / Cascading', value: stats.active_cases,      color: 'text-amber-600' },
+    { label: 'Confirmed',          value: stats.confirmed_cases,   color: 'text-green-600' },
+    { label: 'Completed',          value: stats.completed_cases,   color: 'text-teal-600' },
+    { label: 'Unfilled',           value: stats.unfilled_cases,    color: 'text-red-500' },
+    { label: 'Fill Rate',          value: `${stats.fill_rate}%`,   color: 'text-blue-700' },
+    { label: 'Total Surgeons',     value: stats.total_surgeons,    color: 'text-blue-900' },
+    { label: 'Verified Surgeons',  value: stats.verified_surgeons, color: 'text-green-600' },
+    { label: 'Pending Verification', value: stats.pending_surgeons, color: 'text-amber-600' },
+    { label: 'Platform Commission', value: formatFee(stats.total_commission), color: 'text-teal-600' },
+  ];
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold text-blue-900 mb-6">Platform Overview</h2>
+      <div className="grid grid-cols-5 gap-4">
+        {statCards.map(card => (
+          <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className={`text-2xl font-bold ${card.color}`}>{card.value}</div>
+            <div className="text-gray-500 text-xs mt-1">{card.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CASES TAB
+// All cases with filters, status updates, reassign, cascade override
+// ══════════════════════════════════════════════════════════════════════════════
+function CasesTab() {
+  const [cases, setCases]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [filter, setFilter]       = useState('all');
+  const [actionMsg, setActionMsg] = useState('');
+
+  // Reassign modal state
+  const [reassignCase, setReassignCase]     = useState(null);
+  const [allSurgeons, setAllSurgeons]       = useState([]);
+  const [selectedSurgeon, setSelectedSurgeon] = useState('');
+  const [reassigning, setReassigning]       = useState(false);
+
+  const fetchCases = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/cases`, { params: { status: filter } });
+      setCases(res.data.cases || []);
+    } catch (err) {
+      console.error('Failed to fetch cases:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => { fetchCases(); }, [fetchCases]);
+
+  // Flash action message for 3 seconds
+  const showMsg = (msg) => {
+    setActionMsg(msg);
+    setTimeout(() => setActionMsg(''), 3000);
+  };
+
+  // Update case status
+  const updateStatus = async (caseId, status) => {
+    try {
+      await axios.patch(`${API_URL}/api/admin/cases/${caseId}/status`, { status });
+      showMsg(`Case marked as ${status}`);
+      fetchCases();
+    } catch (err) {
+      showMsg('Failed to update status');
+    }
+  };
+
+  // Manually trigger cascade
+  const triggerCascade = async (caseId) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/admin/cases/${caseId}/cascade`);
+      showMsg(res.data.message);
+      fetchCases();
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to trigger cascade');
+    }
+  };
+
+  // Open reassign modal
+  const openReassign = async (case_) => {
+    setReassignCase(case_);
+    setSelectedSurgeon('');
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/surgeons`, { params: { filter: 'verified' } });
+      setAllSurgeons(res.data.surgeons || []);
+    } catch (err) {
+      console.error('Failed to load surgeons:', err);
+    }
+  };
+
+  // Submit reassignment
+  const submitReassign = async () => {
+    if (!selectedSurgeon) return;
+    setReassigning(true);
+    try {
+      await axios.patch(`${API_URL}/api/admin/cases/${reassignCase.id}/reassign`, {
+        surgeon_id: selectedSurgeon,
+      });
+      showMsg('Case reassigned successfully');
+      setReassignCase(null);
+      fetchCases();
+    } catch (err) {
+      showMsg('Failed to reassign case');
+    } finally {
+      setReassigning(false);
+    }
+  };
+
+  const filters = ['all', 'active', 'cascading', 'confirmed', 'completed', 'cancelled', 'unfilled'];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-blue-900">All Cases</h2>
+        {actionMsg && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm">
+            ✓ {actionMsg}
+          </div>
         )}
       </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {filters.map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold capitalize transition ${
+              filter === f
+                ? 'bg-blue-700 text-white'
+                : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-400'
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {loading ? <Spinner /> : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {cases.length === 0 ? (
+            <div className="p-12 text-center text-gray-400">No cases found</div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  {['Case', 'Procedure', 'Hospital', 'Date', 'Fee', 'Surgeon', 'Status', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {cases.map(c => {
+                  const st = CASE_STATUS[c.status] || CASE_STATUS.active;
+                  return (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-mono text-blue-700">
+                        SOC-{String(c.case_number).padStart(3, '0')}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{c.procedure}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {c.hospitals?.name}<br />
+                        <span className="text-xs text-gray-400">{c.hospitals?.city}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{formatDate(c.surgery_date)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{formatFee(c.fee_max)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {c.surgeons?.name || <span className="text-gray-400 italic">Not assigned</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${st.bg} ${st.text}`}>
+                          {st.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1 flex-wrap">
+                          {/* Reassign surgeon */}
+                          {['confirmed', 'cascading', 'active'].includes(c.status) && (
+                            <ActionBtn color="blue" onClick={() => openReassign(c)}>Reassign</ActionBtn>
+                          )}
+                          {/* Trigger cascade */}
+                          {['active', 'cascading'].includes(c.status) && (
+                            <ActionBtn color="amber" onClick={() => triggerCascade(c.id)}>Cascade</ActionBtn>
+                          )}
+                          {/* Mark complete */}
+                          {c.status === 'confirmed' && (
+                            <ActionBtn color="teal" onClick={() => updateStatus(c.id, 'completed')}>Complete</ActionBtn>
+                          )}
+                          {/* Cancel */}
+                          {!['completed', 'cancelled'].includes(c.status) && (
+                            <ActionBtn color="red" onClick={() => {
+                              if (window.confirm('Cancel this case?')) updateStatus(c.id, 'cancelled');
+                            }}>Cancel</ActionBtn>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* ── REASSIGN MODAL ── */}
+      {reassignCase && (
+        <Modal title={`Reassign Surgeon — SOC-${String(reassignCase.case_number).padStart(3,'0')}`} onClose={() => setReassignCase(null)}>
+          <p className="text-sm text-gray-600 mb-4">
+            Select a verified surgeon to manually assign to this case.
+            The current surgeon (if any) will be marked as overridden.
+          </p>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Select Surgeon</label>
+          <select
+            value={selectedSurgeon}
+            onChange={e => setSelectedSurgeon(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 mb-4"
+          >
+            <option value="">— Choose a surgeon —</option>
+            {allSurgeons.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.specialty?.join(', ')} · {s.city}
+              </option>
+            ))}
+          </select>
+          <div className="flex gap-3 justify-end">
+            <button onClick={() => setReassignCase(null)} className="px-4 py-2 text-sm text-gray-600 font-semibold">
+              Cancel
+            </button>
+            <button
+              onClick={submitReassign}
+              disabled={!selectedSurgeon || reassigning}
+              className="bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white px-5 py-2 rounded-lg text-sm font-semibold"
+            >
+              {reassigning ? 'Reassigning...' : 'Confirm Reassign'}
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SURGEONS TAB
+// All surgeons with verify/reject/suspend/reactivate actions
+// ══════════════════════════════════════════════════════════════════════════════
+function SurgeonsTab() {
+  const [surgeons, setSurgeons]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [filter, setFilter]       = useState('all');
+  const [actionMsg, setActionMsg] = useState('');
+
+  const fetchSurgeons = useCallback(async () => {
+    setLoading(true);
+    try {
+      const filterParam = filter === 'verified' ? { available: 'true' } 
+                  : filter === 'pending'   ? { available: 'false' }
+                  : {};
+      const res = await axios.get(`${API_URL}/api/admin/surgeons`, { params: filterParam });
+      setSurgeons(res.data.surgeons || []);
+    } catch (err) {
+      console.error('Failed to fetch surgeons:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => { fetchSurgeons(); }, [fetchSurgeons]);
+
+  const showMsg = (msg) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 3000); };
+
+  const verifyAction = async (id, action) => {
+    try {
+      await axios.patch(`${API_URL}/api/admin/surgeons/${id}/verify`, { action });
+      showMsg(`Surgeon ${action}ed successfully`);
+      fetchSurgeons();
+    } catch (err) {
+      showMsg('Action failed');
+    }
+  };
+
+  const suspendAction = async (id, action) => {
+    try {
+      await axios.patch(`${API_URL}/api/admin/surgeons/${id}/suspend`, { action });
+      showMsg(`Surgeon ${action}ed successfully`);
+      fetchSurgeons();
+    } catch (err) {
+      showMsg('Action failed');
+    }
+  };
+
+  const filters = ['all', 'pending', 'verified', 'suspended'];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-blue-900">Surgeons</h2>
+        {actionMsg && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm">
+            ✓ {actionMsg}
+          </div>
+        )}
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 mb-5">
+        {filters.map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold capitalize transition ${
+              filter === f
+                ? 'bg-blue-700 text-white'
+                : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-400'
+            }`}
+          >
+            {f === 'pending' ? '⏳ Pending Verification' : f === 'verified' ? '✅ Verified' : f === 'suspended' ? '🚫 Suspended' : 'All'}
+          </button>
+        ))}
+      </div>
+
+      {loading ? <Spinner /> : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {surgeons.length === 0 ? (
+            <div className="p-12 text-center text-gray-400">No surgeons found</div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  {['Surgeon', 'Phone', 'Specialty', 'City', 'MCI No.', 'Cases', 'Rating', 'Status', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {surgeons.map(s => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-sm text-gray-800">{s.name}</div>
+                      <div className="text-xs text-gray-400">{s.experience_years} yrs exp</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{s.phone}</td>
+                    <td className="px-4 py-3 text-xs text-gray-600 max-w-32">
+                      {s.specialty?.join(', ') || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{s.city}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{s.mci_number || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{s.total_cases}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">⭐ {s.rating}</td>
+                    <td className="px-4 py-3">
+                      {s.status === 'suspended' ? (
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-600">Suspended</span>
+                      ) : s.verified ? (
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">✅ Verified</span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">⏳ Pending</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 flex-wrap">
+                        {/* Verify/Reject — for unverified surgeons */}
+                        {!s.verified && s.status !== 'suspended' && (
+                          <>
+                            <ActionBtn color="green" onClick={() => verifyAction(s.id, 'verify')}>Verify</ActionBtn>
+                            <ActionBtn color="red" onClick={() => {
+                              if (window.confirm(`Reject ${s.name}?`)) verifyAction(s.id, 'reject');
+                            }}>Reject</ActionBtn>
+                          </>
+                        )}
+                        {/* Suspend — for verified active surgeons */}
+                        {s.verified && s.status === 'active' && (
+                          <ActionBtn color="red" onClick={() => {
+                            if (window.confirm(`Suspend ${s.name}?`)) suspendAction(s.id, 'suspend');
+                          }}>Suspend</ActionBtn>
+                        )}
+                        {/* Reactivate — for suspended surgeons */}
+                        {s.status === 'suspended' && (
+                          <ActionBtn color="green" onClick={() => suspendAction(s.id, 'reactivate')}>Reactivate</ActionBtn>
+                        )}
+                        {/* View documents */}
+                        {s.certificate_url && (
+  
+                           <a href={s.certificate_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-1 rounded text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                          >
+                            Docs
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EARNINGS TAB
+// Commission report across all cases
+// ══════════════════════════════════════════════════════════════════════════════
+function EarningsTab() {
+  const [earnings, setEarnings] = useState([]);
+  const [summary, setSummary]   = useState(null);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    const fetchEarnings = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/admin/earnings`);
+        setEarnings(res.data.earnings || []);
+        setSummary(res.data.summary || {});
+      } catch (err) {
+        console.error('Failed to fetch earnings:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEarnings();
+  }, []);
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold text-blue-900 mb-6">Earnings & Commission</h2>
+
+      {/* Summary cards */}
+      {summary && (
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <SummaryCard label="Total Cases" value={summary.total_cases} color="text-blue-900" />
+          <SummaryCard label="Total Commission" value={formatFee(summary.total_commission)} color="text-teal-600" />
+          <SummaryCard label="From Hospitals (5%)" value={formatFee(summary.hospital_commission)} color="text-blue-700" />
+          <SummaryCard label="From Surgeons (5%)" value={formatFee(summary.surgeon_commission)} color="text-green-600" />
+        </div>
+      )}
+
+      {/* Earnings table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {earnings.length === 0 ? (
+          <div className="p-12 text-center text-gray-400">No completed cases yet</div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                {['Case', 'Procedure', 'Hospital', 'Surgeon', 'Date', 'Surgeon Fee', 'Hospital Comm (5%)', 'Surgeon Comm (5%)', 'Total Comm', 'Status'].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {earnings.map(e => {
+                const st = CASE_STATUS[e.status] || CASE_STATUS.confirmed;
+                return (
+                  <tr key={e.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-mono text-blue-700">SOC-{String(e.case_number).padStart(3,'0')}</td>
+                    <td className="px-4 py-3 text-sm text-gray-800">{e.procedure}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{e.hospitals?.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{e.surgeons?.name || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(e.surgery_date)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-800">{formatFee(e.surgeon_fee)}</td>
+                    <td className="px-4 py-3 text-sm text-blue-700">{formatFee(e.hospital_commission)}</td>
+                    <td className="px-4 py-3 text-sm text-green-600">{formatFee(e.surgeon_commission)}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-teal-700">{formatFee(e.total_commission)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${st.bg} ${st.text}`}>{st.label}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SHARED UI COMPONENTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Small action button used in tables
+function ActionBtn({ children, onClick, color = 'blue' }) {
+  const colors = {
+    blue:  'bg-blue-50 text-blue-700 hover:bg-blue-100',
+    green: 'bg-green-50 text-green-700 hover:bg-green-100',
+    amber: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+    teal:  'bg-teal-50 text-teal-700 hover:bg-teal-100',
+    red:   'bg-red-50 text-red-600 hover:bg-red-100',
+  };
+  return (
+    <button onClick={onClick} className={`px-2 py-1 rounded text-xs font-semibold transition ${colors[color]}`}>
+      {children}
+    </button>
+  );
+}
+
+// Modal wrapper
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// Summary stat card
+function SummaryCard({ label, value, color }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className={`text-2xl font-bold ${color}`}>{value}</div>
+      <div className="text-gray-500 text-sm mt-1">{label}</div>
+    </div>
+  );
+}
+
+// Loading spinner
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
     </div>
   );
 }

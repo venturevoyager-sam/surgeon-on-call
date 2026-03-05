@@ -7000,3 +7000,398 @@
 [2026-03-05 11:39:54] INFO: Fetching case detail | {"case_id":"5be5c460-1787-4e29-98eb-0da815b846f6"}
 [2026-03-05 11:39:55] INFO: Case detail fetched | {"case_id":"5be5c460-1787-4e29-98eb-0da815b846f6","priority_list_count":4}
 [2026-03-05 11:39:55] INFO: ← GET /5be5c460-1787-4e29-98eb-0da815b846f6 200 (653ms) | {"response":{"success":true}}
+[2026-03-05 11:40:09] INFO: Daily reminder cron job scheduled — runs at 9:00 AM IST
+[2026-03-05 11:40:09] INFO: Surgeon on Call API started | {"port":"5000","company":"Vaidhya Healthcare Pvt Ltd"}
+[2026-03-05 11:40:24] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:24] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:24] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":0}
+[2026-03-05 11:40:24] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (397ms) | {"response":{"success":true}}
+[2026-03-05 11:40:24] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:24] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:24] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":0}
+[2026-03-05 11:40:24] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (263ms) | {"response":{"success":true}}
+[2026-03-05 11:40:32] INFO: → PATCH /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"body":{"procedure":"New surgery for testing","specialty_required":"Laparoscopic Surgery","surgery_date":"2026-03-09","surgery_time":"12:00","duration_hours":1.5,"ot_number":"2","fee_min":4200000,"fee_max":4500000,"patient_name":"asdf as df","patient_age":33,"patient_gender":"male","notes":""},"query":{},"ip":"::1"}
+[2026-03-05 11:40:32] INFO: Updating case | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:32] INFO: Case updated successfully | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:32] INFO: ← PATCH /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (305ms) | {"response":{"success":true}}
+[2026-03-05 11:40:32] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:32] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:32] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":0}
+[2026-03-05 11:40:32] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (288ms) | {"response":{"success":true}}
+[2026-03-05 11:40:35] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:35] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:35] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":0}
+[2026-03-05 11:40:35] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (255ms) | {"response":{"success":true}}
+[2026-03-05 11:40:35] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:35] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:35] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a/matches | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:35] INFO: Fetching matches for case | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:35] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":0}
+[2026-03-05 11:40:35] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (293ms) | {"response":{"success":true}}
+[2026-03-05 11:40:35] INFO: Fetched hospital city for matching | {"city":"Hyderabad"}
+[2026-03-05 11:40:35] INFO: Matching: querying verified surgeons | {"specialty_required":"Laparoscopic Surgery"}
+[2026-03-05 11:40:35] INFO: Matching: surgeons found before conflict check | {"count":4}
+[2026-03-05 11:40:36] INFO: Matching: surgeons available after conflict check | {"count":4}
+[2026-03-05 11:40:36] INFO: Matching complete | {"total_matched":4,"top_surgeon":"Dr. Samdhathri Dontaraju"}
+[2026-03-05 11:40:36] INFO: Matches fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","matches_found":4}
+[2026-03-05 11:40:36] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a/matches 200 (979ms) | {"response":{"success":true}}
+[2026-03-05 11:40:36] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a/matches | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:36] INFO: Fetching matches for case | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:36] INFO: Fetched hospital city for matching | {"city":"Hyderabad"}
+[2026-03-05 11:40:36] INFO: Matching: querying verified surgeons | {"specialty_required":"Laparoscopic Surgery"}
+[2026-03-05 11:40:36] INFO: Matching: surgeons found before conflict check | {"count":4}
+[2026-03-05 11:40:37] INFO: Matching: surgeons available after conflict check | {"count":4}
+[2026-03-05 11:40:37] INFO: Matching complete | {"total_matched":4,"top_surgeon":"Dr. Samdhathri Dontaraju"}
+[2026-03-05 11:40:37] INFO: Matches fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","matches_found":4}
+[2026-03-05 11:40:37] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a/matches 200 (907ms) | {"response":{"success":true}}
+[2026-03-05 11:40:40] INFO: → PATCH /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a/priority | {"body":{"priority_list":["3c4cefd8-677a-4039-b6fd-aec8653fc910","1b385c9b-b4b1-4c5f-9339-be10527b4aa4","f8544284-5a64-45e7-8564-c40a77058f64"]},"query":{},"ip":"::1"}
+[2026-03-05 11:40:40] INFO: Saving priority list for case | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","surgeons":["3c4cefd8-677a-4039-b6fd-aec8653fc910","1b385c9b-b4b1-4c5f-9339-be10527b4aa4","f8544284-5a64-45e7-8564-c40a77058f64"]}
+[2026-03-05 11:40:40] INFO: Inserting priority list rows | {"count":3}
+[2026-03-05 11:40:40] INFO: Triggering cascade for case | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:41] INFO: Cascade: surgeon notified | {"surgeon_name":"Dr. Samdhathri Dontaraju","priority_order":1,"expires_at":"2026-03-05T08:10:40.885Z"}
+[2026-03-05 11:40:41] INFO: Sending WhatsApp | {"to":"whatsapp:+918686269480","message_length":323}
+[2026-03-05 11:40:41] INFO: WhatsApp sent successfully | {"to":"whatsapp:+918686269480"}
+[2026-03-05 11:40:41] INFO: Priority list saved and cascade triggered | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:41] INFO: ← PATCH /db923f87-2e08-43a1-bd71-8bfc1057cd0a/priority 200 (1478ms) | {"response":{"success":true}}
+[2026-03-05 11:40:41] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:41] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:42] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:40:42] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (254ms) | {"response":{"success":true}}
+[2026-03-05 11:40:42] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:40:42] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:40:42] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:40:42] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (259ms) | {"response":{"success":true}}
+[2026-03-05 11:41:11] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:41:11] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:41:12] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:41:12] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (492ms) | {"response":{"success":true}}
+[2026-03-05 11:41:41] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:41:41] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:41:42] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:41:42] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (366ms) | {"response":{"success":true}}
+[2026-03-05 11:42:11] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:42:11] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:42:12] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:42:12] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (397ms) | {"response":{"success":true}}
+[2026-03-05 11:42:42] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:42:42] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:42:43] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:42:43] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (377ms) | {"response":{"success":true}}
+[2026-03-05 11:43:12] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:43:12] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:43:13] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:43:13] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (291ms) | {"response":{"success":true}}
+[2026-03-05 11:43:42] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:43:42] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:43:43] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:43:43] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (662ms) | {"response":{"success":true}}
+[2026-03-05 11:44:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:44:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:44:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:44:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (384ms) | {"response":{"success":true}}
+[2026-03-05 11:45:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:45:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:45:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:45:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (368ms) | {"response":{"success":true}}
+[2026-03-05 11:46:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:46:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:46:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:46:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (616ms) | {"response":{"success":true}}
+[2026-03-05 11:47:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:47:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:47:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:47:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (369ms) | {"response":{"success":true}}
+[2026-03-05 11:48:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:48:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:48:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:48:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (611ms) | {"response":{"success":true}}
+[2026-03-05 11:49:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:49:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:49:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:49:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (481ms) | {"response":{"success":true}}
+[2026-03-05 11:50:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:50:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:50:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:50:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (385ms) | {"response":{"success":true}}
+[2026-03-05 11:51:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:51:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:51:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:51:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (345ms) | {"response":{"success":true}}
+[2026-03-05 11:52:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:52:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:52:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:52:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (484ms) | {"response":{"success":true}}
+[2026-03-05 11:53:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:53:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:53:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:53:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (561ms) | {"response":{"success":true}}
+[2026-03-05 11:54:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:54:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:54:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:54:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (512ms) | {"response":{"success":true}}
+[2026-03-05 11:55:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:55:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:55:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:55:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (386ms) | {"response":{"success":true}}
+[2026-03-05 11:56:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:56:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:56:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:56:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (507ms) | {"response":{"success":true}}
+[2026-03-05 11:57:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:57:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:57:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:57:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (337ms) | {"response":{"success":true}}
+[2026-03-05 11:58:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:58:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:58:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:58:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (562ms) | {"response":{"success":true}}
+[2026-03-05 11:59:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 11:59:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 11:59:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 11:59:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (351ms) | {"response":{"success":true}}
+[2026-03-05 12:00:02] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:02] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:00:02] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:02] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:02] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:00:02] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:02] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:00:02] INFO: ← GET /cases 200 (207ms) | {"response":{"success":true}}
+[2026-03-05 12:00:02] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:00:02] INFO: ← GET /surgeons 200 (197ms) | {"response":{"success":true}}
+[2026-03-05 12:00:02] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:02] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:00:02] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:02] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:00:02] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:00:02] INFO: ← GET /cases 200 (121ms) | {"response":{"success":true}}
+[2026-03-05 12:00:02] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:00:02] INFO: ← GET /surgeons 200 (123ms) | {"response":{"success":true}}
+[2026-03-05 12:00:08] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:08] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:00:08] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:08] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:00:08] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:08] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:08] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:00:08] INFO: ← GET /cases 200 (199ms) | {"response":{"success":true}}
+[2026-03-05 12:00:08] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:00:08] INFO: ← GET /surgeons 200 (199ms) | {"response":{"success":true}}
+[2026-03-05 12:00:08] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:08] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:00:08] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:08] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:00:09] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:00:09] INFO: ← GET /surgeons 200 (120ms) | {"response":{"success":true}}
+[2026-03-05 12:00:09] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:00:09] INFO: ← GET /cases 200 (130ms) | {"response":{"success":true}}
+[2026-03-05 12:00:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:00:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:00:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (306ms) | {"response":{"success":true}}
+[2026-03-05 12:00:31] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:31] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:00:31] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:31] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:00:31] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:31] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:31] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:00:31] INFO: ← GET /cases 200 (162ms) | {"response":{"success":true}}
+[2026-03-05 12:00:31] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:31] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:00:31] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:00:31] INFO: ← GET /surgeons 200 (168ms) | {"response":{"success":true}}
+[2026-03-05 12:00:31] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:00:31] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:00:31] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:00:31] INFO: ← GET /cases 200 (123ms) | {"response":{"success":true}}
+[2026-03-05 12:00:31] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:00:31] INFO: ← GET /surgeons 200 (120ms) | {"response":{"success":true}}
+[2026-03-05 12:01:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:01:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:01:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:01:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (503ms) | {"response":{"success":true}}
+[2026-03-05 12:02:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:02:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:02:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:02:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (612ms) | {"response":{"success":true}}
+[2026-03-05 12:03:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:03:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:03:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:03:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (374ms) | {"response":{"success":true}}
+[2026-03-05 12:04:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:04:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:04:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:04:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (538ms) | {"response":{"success":true}}
+[2026-03-05 12:05:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:05:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:05:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:05:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (324ms) | {"response":{"success":true}}
+[2026-03-05 12:06:03] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:06:03] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:06:03] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:06:03] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:06:03] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:06:03] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:06:04] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:06:04] INFO: ← GET /cases 200 (198ms) | {"response":{"success":true}}
+[2026-03-05 12:06:04] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:06:04] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:06:04] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:06:04] INFO: ← GET /surgeons 200 (202ms) | {"response":{"success":true}}
+[2026-03-05 12:06:04] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:06:04] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:06:04] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:06:04] INFO: ← GET /cases 200 (118ms) | {"response":{"success":true}}
+[2026-03-05 12:06:04] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:06:04] INFO: ← GET /surgeons 200 (117ms) | {"response":{"success":true}}
+[2026-03-05 12:06:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:06:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:06:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:06:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (272ms) | {"response":{"success":true}}
+[2026-03-05 12:07:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:07:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:07:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:07:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (302ms) | {"response":{"success":true}}
+[2026-03-05 12:08:02] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:02] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:08:02] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:02] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:08:02] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:02] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:03] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:08:03] INFO: ← GET /surgeons 200 (183ms) | {"response":{"success":true}}
+[2026-03-05 12:08:03] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:03] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:08:03] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:08:03] INFO: ← GET /cases 200 (210ms) | {"response":{"success":true}}
+[2026-03-05 12:08:03] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:03] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:08:03] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:08:03] INFO: ← GET /surgeons 200 (136ms) | {"response":{"success":true}}
+[2026-03-05 12:08:03] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:08:03] INFO: ← GET /cases 200 (128ms) | {"response":{"success":true}}
+[2026-03-05 12:08:07] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:07] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:08:07] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:07] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:08:07] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:07] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:08] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:08:08] INFO: ← GET /surgeons 200 (152ms) | {"response":{"success":true}}
+[2026-03-05 12:08:08] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:08] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:08:08] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:08:08] INFO: ← GET /cases 200 (170ms) | {"response":{"success":true}}
+[2026-03-05 12:08:08] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:08] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:08:08] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:08:08] INFO: ← GET /surgeons 200 (118ms) | {"response":{"success":true}}
+[2026-03-05 12:08:08] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:08:08] INFO: ← GET /cases 200 (119ms) | {"response":{"success":true}}
+[2026-03-05 12:08:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:08:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:08:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (315ms) | {"response":{"success":true}}
+[2026-03-05 12:08:23] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:23] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:08:23] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:23] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:08:23] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:23] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:23] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:08:23] INFO: ← GET /surgeons 200 (125ms) | {"response":{"success":true}}
+[2026-03-05 12:08:23] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:23] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:08:24] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:08:24] INFO: ← GET /cases 200 (167ms) | {"response":{"success":true}}
+[2026-03-05 12:08:24] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:08:24] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:08:24] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:08:24] INFO: ← GET /surgeons 200 (119ms) | {"response":{"success":true}}
+[2026-03-05 12:08:24] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:08:24] INFO: ← GET /cases 200 (131ms) | {"response":{"success":true}}
+[2026-03-05 12:09:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:09:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:09:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:09:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (329ms) | {"response":{"success":true}}
+[2026-03-05 12:09:33] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:09:33] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:09:33] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:09:33] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:09:33] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:09:33] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:09:34] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:09:34] INFO: ← GET /surgeons 200 (158ms) | {"response":{"success":true}}
+[2026-03-05 12:09:34] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:09:34] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:09:34] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:09:34] INFO: ← GET /cases 200 (176ms) | {"response":{"success":true}}
+[2026-03-05 12:09:34] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:09:34] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:09:34] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:09:34] INFO: ← GET /surgeons 200 (130ms) | {"response":{"success":true}}
+[2026-03-05 12:09:34] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:09:34] INFO: ← GET /cases 200 (124ms) | {"response":{"success":true}}
+[2026-03-05 12:10:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:10:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:10:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:10:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (609ms) | {"response":{"success":true}}
+[2026-03-05 12:11:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:11:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:11:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (325ms) | {"response":{"success":true}}
+[2026-03-05 12:11:25] INFO: Daily reminder cron job scheduled — runs at 9:00 AM IST
+[2026-03-05 12:11:25] INFO: Surgeon on Call API started | {"port":"5000","company":"Vaidhya Healthcare Pvt Ltd"}
+[2026-03-05 12:11:30] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:30] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:11:30] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:30] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:11:30] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:30] INFO: Admin: fetching earnings report
+[2026-03-05 12:11:30] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:11:30] INFO: ← GET /surgeons 200 (191ms) | {"response":{"success":true}}
+[2026-03-05 12:11:30] INFO: Admin: earnings fetched | {"total_cases":1}
+[2026-03-05 12:11:30] INFO: ← GET /earnings 200 (194ms) | {"response":{"success":true}}
+[2026-03-05 12:11:30] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:30] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:11:30] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:30] INFO: Admin: fetching earnings report
+[2026-03-05 12:11:30] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:11:30] INFO: ← GET /surgeons 200 (126ms) | {"response":{"success":true}}
+[2026-03-05 12:11:30] INFO: Admin: earnings fetched | {"total_cases":1}
+[2026-03-05 12:11:30] INFO: ← GET /earnings 200 (129ms) | {"response":{"success":true}}
+[2026-03-05 12:11:30] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:11:30] INFO: ← GET /cases 200 (462ms) | {"response":{"success":true}}
+[2026-03-05 12:11:30] INFO: → GET /api/admin/cases | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:30] INFO: Admin: fetching all cases | {}
+[2026-03-05 12:11:30] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:11:30] INFO: ← GET /cases 200 (128ms) | {"response":{"success":true}}
+[2026-03-05 12:11:50] INFO: → GET /api/admin/cases?status=all | {"query":{"status":"all"},"ip":"::1"}
+[2026-03-05 12:11:50] INFO: Admin: fetching all cases | {"status":"all"}
+[2026-03-05 12:11:50] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:11:50] INFO: ← GET /cases?status=all 200 (168ms) | {"response":{"success":true}}
+[2026-03-05 12:11:50] INFO: → GET /api/admin/cases?status=all | {"query":{"status":"all"},"ip":"::1"}
+[2026-03-05 12:11:50] INFO: Admin: fetching all cases | {"status":"all"}
+[2026-03-05 12:11:50] INFO: Admin cases fetched | {"total":11,"after_filter":11}
+[2026-03-05 12:11:50] INFO: ← GET /cases?status=all 200 (127ms) | {"response":{"success":true}}
+[2026-03-05 12:11:53] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:53] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:11:53] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:11:53] INFO: ← GET /surgeons 200 (124ms) | {"response":{"success":true}}
+[2026-03-05 12:11:53] INFO: → GET /api/admin/surgeons | {"query":{},"ip":"::1"}
+[2026-03-05 12:11:53] INFO: Admin: fetching all surgeons | {}
+[2026-03-05 12:11:53] INFO: Admin surgeons fetched | {"total":6,"after_filter":6}
+[2026-03-05 12:11:53] INFO: ← GET /surgeons 200 (127ms) | {"response":{"success":true}}
+[2026-03-05 12:12:03] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:12:03] INFO: Admin: fetching earnings report
+[2026-03-05 12:12:03] INFO: Admin: earnings fetched | {"total_cases":1}
+[2026-03-05 12:12:03] INFO: ← GET /earnings 200 (168ms) | {"response":{"success":true}}
+[2026-03-05 12:12:03] INFO: → GET /api/admin/earnings | {"query":{},"ip":"::1"}
+[2026-03-05 12:12:03] INFO: Admin: fetching earnings report
+[2026-03-05 12:12:03] INFO: Admin: earnings fetched | {"total_cases":1}
+[2026-03-05 12:12:03] INFO: ← GET /earnings 200 (119ms) | {"response":{"success":true}}
+[2026-03-05 12:12:21] INFO: → GET /api/cases/db923f87-2e08-43a1-bd71-8bfc1057cd0a | {"query":{},"ip":"::1"}
+[2026-03-05 12:12:21] INFO: Fetching case detail | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a"}
+[2026-03-05 12:12:22] INFO: Case detail fetched | {"case_id":"db923f87-2e08-43a1-bd71-8bfc1057cd0a","priority_list_count":3}
+[2026-03-05 12:12:22] INFO: ← GET /db923f87-2e08-43a1-bd71-8bfc1057cd0a 200 (460ms) | {"response":{"success":true}}

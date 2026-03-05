@@ -461,4 +461,373 @@ router.patch('/cases/:id/override', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/surgeons
+// Returns all surgeons with optional status filter
+// Called by: Admin Dashboard — Surgeons tab
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/surgeons', async (req, res) => {
+  const { filter } = req.query; // 'all' | 'pending' | 'verified' | 'suspended'
+  logger.info('Admin: fetching surgeons', { filter });
+
+  try {
+    let query = supabase
+      .from('surgeons')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (filter === 'pending')   query = query.eq('verified', false).eq('status', 'active');
+    if (filter === 'verified')  query = query.eq('verified', true).eq('status', 'active');
+    if (filter === 'suspended') query = query.eq('status', 'suspended');
+
+    const { data: surgeons, error } = await query;
+    if (error) throw error;
+
+    logger.info('Admin: surgeons fetched', { count: surgeons.length });
+    return res.json({ surgeons });
+  } catch (error) {
+    logger.error('Admin: failed to fetch surgeons', { error: error.message });
+    return res.status(500).json({ message: 'Failed to fetch surgeons' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/admin/surgeons/:id/verify
+// Verify or reject a surgeon registration
+// Body: { action: 'verify' | 'reject' }
+// Called by: Admin Dashboard — Surgeons tab
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/surgeons/:id/verify', async (req, res) => {
+  const { id } = req.params;
+  const { action } = req.body; // 'verify' or 'reject'
+
+  logger.info('Admin: surgeon verification action', { surgeon_id: id, action });
+
+  try {
+    const updates = action === 'verify'
+      ? { verified: true, status: 'active', available: true }
+      : { verified: false, status: 'rejected' };
+
+    const { data: surgeon, error } = await supabase
+      .from('surgeons')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    logger.info('Admin: surgeon verification updated', { surgeon_id: id, action });
+    return res.json({ message: `Surgeon ${action}ed successfully`, surgeon });
+  } catch (error) {
+    logger.error('Admin: failed to verify surgeon', { error: error.message });
+    return res.status(500).json({ message: 'Failed to update surgeon' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/admin/surgeons/:id/suspend
+// Suspend or reactivate a surgeon
+// Body: { action: 'suspend' | 'reactivate' }
+// Called by: Admin Dashboard — Surgeons tab
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/surgeons/:id/suspend', async (req, res) => {
+  const { id } = req.params;
+  const { action } = req.body; // 'suspend' or 'reactivate'
+
+  logger.info('Admin: surgeon suspend action', { surgeon_id: id, action });
+
+  try {
+    const updates = action === 'suspend'
+      ? { status: 'suspended', available: false }
+      : { status: 'active', available: true };
+
+    const { data: surgeon, error } = await supabase
+      .from('surgeons')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    logger.info('Admin: surgeon suspend updated', { surgeon_id: id, action });
+    return res.json({ message: `Surgeon ${action}d successfully`, surgeon });
+  } catch (error) {
+    logger.error('Admin: failed to suspend surgeon', { error: error.message });
+    return res.status(500).json({ message: 'Failed to update surgeon' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/cases
+// Returns all cases across all hospitals with optional filter
+// Called by: Admin Dashboard — Cases tab
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/cases', async (req, res) => {
+  const { filter } = req.query; // 'all' | 'active' | 'cascading' | 'confirmed' | 'completed' | 'unfilled'
+  logger.info('Admin: fetching all cases', { filter });
+
+  try {
+    let query = supabase
+      .from('cases')
+      .select(`
+        *,
+        hospitals ( name, city ),
+        surgeons!cases_confirmed_surgeon_id_fkey ( name, phone )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filter && filter !== 'all') query = query.eq('status', filter);
+
+    const { data: cases, error } = await query;
+    if (error) throw error;
+
+    logger.info('Admin: cases fetched', { count: cases.length });
+    return res.json({ cases });
+  } catch (error) {
+    logger.error('Admin: failed to fetch cases', { error: error.message });
+    return res.status(500).json({ message: 'Failed to fetch cases' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/admin/cases/:id/status
+// Update case status — mark complete, cancel, etc.
+// Body: { status: 'completed' | 'cancelled' }
+// Called by: Admin Dashboard — Cases tab
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/cases/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const allowed = ['completed', 'cancelled', 'active', 'cascading'];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ message: `Invalid status. Allowed: ${allowed.join(', ')}` });
+  }
+
+  logger.info('Admin: updating case status', { case_id: id, status });
+
+  try {
+    const { data: case_, error } = await supabase
+      .from('cases')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    logger.info('Admin: case status updated', { case_id: id, status });
+    return res.json({ message: 'Case status updated', case: case_ });
+  } catch (error) {
+    logger.error('Admin: failed to update case status', { error: error.message });
+    return res.status(500).json({ message: 'Failed to update case status' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/admin/cases/:id/reassign
+// Manually reassign a confirmed case to a different surgeon
+// Body: { surgeon_id: '...' }
+// Called by: Admin Dashboard — Cases tab (reassign modal)
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/cases/:id/reassign', async (req, res) => {
+  const { id } = req.params;
+  const { surgeon_id } = req.body;
+
+  if (!surgeon_id) return res.status(400).json({ message: 'surgeon_id required' });
+
+  logger.info('Admin: reassigning case', { case_id: id, surgeon_id });
+
+  try {
+    // Update case confirmed surgeon
+    const { data: case_, error: caseError } = await supabase
+      .from('cases')
+      .update({ confirmed_surgeon_id: surgeon_id, status: 'confirmed' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (caseError) throw caseError;
+
+    // Update case_priority_list — mark previous accepted as overridden,
+    // insert new row for reassigned surgeon as accepted
+    await supabase
+      .from('case_priority_list')
+      .update({ status: 'overridden' })
+      .eq('case_id', id)
+      .eq('status', 'accepted');
+
+    // Check if surgeon already has a row in priority list
+    const { data: existingRow } = await supabase
+      .from('case_priority_list')
+      .select('id')
+      .eq('case_id', id)
+      .eq('surgeon_id', surgeon_id)
+      .single();
+
+    if (existingRow) {
+      // Update existing row
+      await supabase
+        .from('case_priority_list')
+        .update({ status: 'accepted', responded_at: new Date().toISOString() })
+        .eq('id', existingRow.id);
+    } else {
+      // Insert new row for manually assigned surgeon
+      await supabase
+        .from('case_priority_list')
+        .insert({
+          case_id:        id,
+          surgeon_id,
+          priority_order: 99, // Manual override — appears at bottom
+          status:         'accepted',
+          notified_at:    new Date().toISOString(),
+          responded_at:   new Date().toISOString(),
+        });
+    }
+
+    logger.info('Admin: case reassigned', { case_id: id, surgeon_id });
+    return res.json({ message: 'Case reassigned successfully', case: case_ });
+  } catch (error) {
+    logger.error('Admin: failed to reassign case', { error: error.message });
+    return res.status(500).json({ message: 'Failed to reassign case' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/cases/:id/cascade
+// Manually trigger cascade on a stuck case
+// Resets current notified surgeon to pending and triggers next
+// Called by: Admin Dashboard — Cases tab
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/cases/:id/cascade', async (req, res) => {
+  const { id } = req.params;
+  logger.info('Admin: manually triggering cascade', { case_id: id });
+
+  try {
+    // Reset any 'notified' rows back to 'pending' so cascade can re-notify
+    await supabase
+      .from('case_priority_list')
+      .update({ status: 'pending', notified_at: null, expires_at: null })
+      .eq('case_id', id)
+      .eq('status', 'notified');
+
+    // Ensure case is in cascading status
+    await supabase
+      .from('cases')
+      .update({ status: 'cascading' })
+      .eq('id', id);
+
+    // Import and run triggerCascade
+    const casesRouter = require('./cases');
+    // Since triggerCascade is not exported, call the cascade endpoint directly
+    // by fetching next pending surgeon and notifying them
+    const { notifyCasePassed } = require('../notifications');
+
+    const { data: nextRow } = await supabase
+      .from('case_priority_list')
+      .select('*, surgeons(name, phone)')
+      .eq('case_id', id)
+      .eq('status', 'pending')
+      .order('priority_order', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (!nextRow) {
+      return res.status(400).json({ message: 'No pending surgeons left in priority list' });
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 2);
+
+    await supabase
+      .from('case_priority_list')
+      .update({
+        status:      'notified',
+        notified_at: new Date().toISOString(),
+        expires_at:  expiresAt.toISOString(),
+      })
+      .eq('id', nextRow.id);
+
+    // Get case details for notification
+    const { data: caseData } = await supabase
+      .from('cases')
+      .select('procedure, surgery_date, surgery_time, fee_max')
+      .eq('id', id)
+      .single();
+
+    if (caseData && nextRow.surgeons?.phone) {
+      await notifyCasePassed({
+        surgeonName:  nextRow.surgeons.name,
+        surgeonPhone: nextRow.surgeons.phone,
+        procedure:    caseData.procedure,
+        surgeryDate:  caseData.surgery_date,
+        surgeryTime:  caseData.surgery_time,
+        feeMax:       caseData.fee_max,
+      });
+    }
+
+    logger.info('Admin: cascade triggered manually', {
+      case_id: id,
+      notified_surgeon: nextRow.surgeons?.name,
+    });
+
+    return res.json({ message: `Cascade triggered — ${nextRow.surgeons?.name} notified` });
+  } catch (error) {
+    logger.error('Admin: failed to trigger cascade', { error: error.message });
+    return res.status(500).json({ message: 'Failed to trigger cascade' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/earnings
+// Returns earnings/commission report
+// Called by: Admin Dashboard — Earnings tab
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/earnings', async (req, res) => {
+  logger.info('Admin: fetching earnings report');
+
+  try {
+    // Fetch all completed and confirmed cases with fee data
+    const { data: cases, error } = await supabase
+      .from('cases')
+      .select(`
+        id, case_number, procedure, surgery_date, fee_max, status,
+        hospitals ( name, city ),
+        surgeons!cases_confirmed_surgeon_id_fkey ( name )
+      `)
+      .in('status', ['confirmed', 'completed'])
+      .order('surgery_date', { ascending: false });
+
+    if (error) throw error;
+
+    // Calculate commission for each case
+    // Platform takes 5% from hospital + 5% from surgeon = 10% total
+    const earningsData = cases.map(c => ({
+      ...c,
+      surgeon_fee:          c.fee_max,
+      hospital_commission:  Math.round(c.fee_max * 0.05),  // 5% from hospital
+      surgeon_commission:   Math.round(c.fee_max * 0.05),  // 5% from surgeon
+      total_commission:     Math.round(c.fee_max * 0.10),  // 10% total
+    }));
+
+    // Summary totals
+    const summary = {
+      total_cases:          earningsData.length,
+      completed_cases:      earningsData.filter(c => c.status === 'completed').length,
+      confirmed_cases:      earningsData.filter(c => c.status === 'confirmed').length,
+      total_commission:     earningsData.reduce((sum, c) => sum + c.total_commission, 0),
+      hospital_commission:  earningsData.reduce((sum, c) => sum + c.hospital_commission, 0),
+      surgeon_commission:   earningsData.reduce((sum, c) => sum + c.surgeon_commission, 0),
+    };
+
+    logger.info('Admin: earnings fetched', { total_cases: summary.total_cases });
+    return res.json({ earnings: earningsData, summary });
+  } catch (error) {
+    logger.error('Admin: failed to fetch earnings', { error: error.message });
+    return res.status(500).json({ message: 'Failed to fetch earnings' });
+  }
+});
+
 module.exports = router;
