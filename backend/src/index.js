@@ -29,6 +29,8 @@ const cors = require('cors');
 const supabase = require('./supabase');
 const logger = require('./logger');
 const requestLogger = require('./middleware/requestLogger');
+const cron = require('node-cron');
+const { notifySurgeryReminder } = require('./notifications');
 
 // ── ROUTE IMPORTS ─────────────────────────────────────────────────────────────
 const casesRouter = require('./routes/cases');
@@ -88,6 +90,67 @@ app.use((err, req, res, next) => {
   });
   res.status(500).json({ message: 'Internal server error' });
 });
+
+// ── DAILY REMINDER CRON JOB ───────────────────────────────────────────────────
+// Runs every day at 9:00 AM IST (3:30 AM UTC)
+// Sends WhatsApp/SMS reminders to surgeons with confirmed cases tomorrow
+cron.schedule('30 3 * * *', async () => {
+  logger.info('Cron: Running daily surgery reminder job');
+
+  try {
+    // Get tomorrow's date range
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    // Find all confirmed cases scheduled for tomorrow
+    const { data: cases, error } = await supabase
+      .from('cases')
+      .select(`
+        id,
+        procedure,
+        surgery_date,
+        surgery_time,
+        surgeons!cases_confirmed_surgeon_id_fkey (
+          id, name, phone
+        ),
+        hospitals (
+          city
+        )
+      `)
+      .eq('status', 'confirmed')
+      .eq('surgery_date', tomorrowStr);
+
+    if (error) {
+      logger.error('Cron: Failed to fetch tomorrow cases', { error: error.message });
+      return;
+    }
+
+    logger.info('Cron: Found confirmed cases for tomorrow', { count: cases?.length || 0 });
+
+    // Send reminder to each confirmed surgeon
+    for (const case_ of cases || []) {
+      if (case_.surgeons?.phone) {
+        await notifySurgeryReminder({
+          surgeonName:  case_.surgeons.name,
+          surgeonPhone: case_.surgeons.phone,
+          procedure:    case_.procedure,
+          surgeryDate:  case_.surgery_date,
+          surgeryTime:  case_.surgery_time,
+          hospitalCity: case_.hospitals?.city,
+        });
+        logger.info('Cron: Reminder sent', { surgeon: case_.surgeons.name, case_id: case_.id });
+      }
+    }
+
+  } catch (err) {
+    logger.error('Cron: Unexpected error in reminder job', { error: err.message });
+  }
+}, {
+  timezone: 'Asia/Kolkata',
+});
+
+logger.info('Daily reminder cron job scheduled — runs at 9:00 AM IST');
 
 // ── SERVER START ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {

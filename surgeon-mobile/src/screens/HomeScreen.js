@@ -308,9 +308,7 @@ export default function HomeScreen({ navigation, surgeonId }) {
               <TouchableOpacity
                 key={request.case_id}
                 style={styles.requestCard}
-                onPress={() => navigation.navigate('RequestDetail', {
-                  caseId: request.case_id
-                })}
+                onPress={() => navigation.navigate('RequestDetail', {caseId: request.case_id,surgeonId})}
               >
                 {/* Urgent amber top bar */}
                 <View style={styles.requestCardHeader}>

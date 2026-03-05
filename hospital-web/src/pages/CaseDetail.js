@@ -2,14 +2,15 @@
  * CASE DETAIL PAGE - Hospital Web App
  * Company: Vaidhya Healthcare Pvt Ltd
  *
- * Shows the full status of a surgery request after priority list is sent.
+ * Shows the full status of a surgery request.
  *
- * Shows:
+ * Features:
  * - Case summary (procedure, date, time, patient)
- * - Priority cascade tracker (which surgeon was notified, accepted, declined)
- * - Live countdown timer for the surgeon currently being waited on
- * - Confirmed surgeon card (once someone accepts)
- * - GPS tracking button (on surgery day)
+ * - Priority cascade tracker
+ * - Live countdown timer
+ * - Confirmed surgeon card
+ * - Edit case modal (all fields, all statuses)
+ * - Delete case with confirmation
  */
 
 import React, { useState, useEffect } from 'react';
@@ -18,82 +19,146 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
+// Specialty options — must match surgeon specialties
+const SPECIALTY_OPTIONS = [
+  'General Surgery',
+  'Laparoscopic Surgery',
+  'Orthopedic Surgery',
+  'Cardiac Surgery',
+  'Neurosurgery',
+  'Plastic Surgery',
+  'Urological Surgery',
+  'Vascular Surgery',
+  'Thoracic Surgery',
+  'Pediatric Surgery',
+  'Gynecological Surgery',
+  'ENT Surgery',
+  'Ophthalmology',
+  'Oncological Surgery',
+  'Transplant Surgery',
+];
+
 export default function CaseDetail() {
   const navigate = useNavigate();
   const { caseId } = useParams();
 
   // ── STATE ──────────────────────────────────────────────────────────────────
-  const [caseData, setCaseData] = useState(null);
+  const [caseData, setCaseData]     = useState(null);
   const [priorityList, setPriorityList] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState('');
+  const [timeLeft, setTimeLeft]     = useState(null);
 
-  // Countdown timer for the currently notified surgeon
-  const [timeLeft, setTimeLeft] = useState(null);
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm]           = useState({});
+  const [saving, setSaving]               = useState(false);
+  const [saveError, setSaveError]         = useState('');
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting]                   = useState(false);
 
   // ── FETCH CASE ─────────────────────────────────────────────────────────────
+  const fetchCase = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/cases/${caseId}`);
+      setCaseData(response.data.case);
+      setPriorityList(response.data.priority_list || []);
+    } catch (error) {
+      console.error('Error fetching case:', error);
+      setError('Failed to load case details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCase = async () => {
-      try {
-        console.log('Fetching case detail:', caseId);
-        const response = await axios.get(`${API_URL}/api/cases/${caseId}`);
-        console.log('Case detail received:', response.data);
-        setCaseData(response.data.case);
-        setPriorityList(response.data.priority_list || []);
-      } catch (error) {
-        console.error('Error fetching case:', error);
-        setError('Failed to load case details');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchCase();
-
-    // Refresh case data every 30 seconds to pick up status changes
     const interval = setInterval(fetchCase, 30000);
     return () => clearInterval(interval);
   }, [caseId]);
 
   // ── COUNTDOWN TIMER ────────────────────────────────────────────────────────
   useEffect(() => {
-    // Find the currently notified surgeon (status = 'notified')
     const notifiedRow = priorityList.find(row => row.status === 'notified');
-    if (!notifiedRow?.expires_at) {
-      setTimeLeft(null);
-      return;
-    }
+    if (!notifiedRow?.expires_at) { setTimeLeft(null); return; }
 
-    // Calculate time remaining every second
     const timer = setInterval(() => {
       const now = new Date();
       const expires = new Date(notifiedRow.expires_at);
       const diff = expires - now;
-
-      if (diff <= 0) {
-        setTimeLeft('Expired');
-        clearInterval(timer);
-        return;
-      }
-
-      // Format as HH:MM:SS
-      const hours   = Math.floor(diff / 3600000);
-      const minutes = Math.floor((diff % 3600000) / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(
-        `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`
-      );
+      if (diff <= 0) { setTimeLeft('Expired'); clearInterval(timer); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setTimeLeft(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`);
     }, 1000);
 
     return () => clearInterval(timer);
   }, [priorityList]);
 
-  // ── HELPERS ────────────────────────────────────────────────────────────────
+  // ── OPEN EDIT MODAL ────────────────────────────────────────────────────────
+  // Pre-fills the form with current case data
+  const openEditModal = () => {
+    setEditForm({
+      procedure:          caseData.procedure || '',
+      specialty_required: caseData.specialty_required || '',
+      surgery_date:       caseData.surgery_date || '',
+      surgery_time:       caseData.surgery_time?.slice(0, 5) || '',
+      duration_hours:     caseData.duration_hours || '',
+      ot_number:          caseData.ot_number || '',
+      fee_min:            caseData.fee_min ? caseData.fee_min / 100 : '',
+      fee_max:            caseData.fee_max ? caseData.fee_max / 100 : '',
+      patient_name:       caseData.patient_name || '',
+      patient_age:        caseData.patient_age || '',
+      patient_gender:     caseData.patient_gender || '',
+      notes:              caseData.notes || '',
+    });
+    setSaveError('');
+    setShowEditModal(true);
+  };
 
+  // ── SAVE EDITS ─────────────────────────────────────────────────────────────
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    try {
+      await axios.patch(`${API_URL}/api/cases/${caseId}`, {
+        ...editForm,
+        // Convert fee back to paise
+        fee_min: Math.round(parseFloat(editForm.fee_min) * 100),
+        fee_max: Math.round(parseFloat(editForm.fee_max) * 100),
+        patient_age: parseInt(editForm.patient_age),
+        duration_hours: parseFloat(editForm.duration_hours),
+      });
+      await fetchCase();
+      setShowEditModal(false);
+    } catch (err) {
+      setSaveError(err.response?.data?.message || 'Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── DELETE CASE ────────────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await axios.delete(`${API_URL}/api/cases/${caseId}`);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  // ── HELPERS ────────────────────────────────────────────────────────────────
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short', year: 'numeric'
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
     });
   };
 
@@ -102,84 +167,61 @@ export default function CaseDetail() {
     return '₹' + (paise / 100).toLocaleString('en-IN');
   };
 
-  // Status styles for cascade tracker
-  const cascadeStyles = {
-    pending:  { bg: 'bg-gray-100', text: 'text-gray-500', badge: 'bg-gray-200 text-gray-600',   icon: '⏳', label: 'Waiting' },
-    notified: { bg: 'bg-amber-50', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-700', icon: '📲', label: 'Notified' },
-    accepted: { bg: 'bg-green-50', text: 'text-green-700', badge: 'bg-green-100 text-green-700', icon: '✅', label: 'Accepted' },
-    declined: { bg: 'bg-red-50',   text: 'text-red-600',   badge: 'bg-red-100 text-red-600',     icon: '❌', label: 'Declined' },
-    expired:  { bg: 'bg-gray-50',  text: 'text-gray-400',  badge: 'bg-gray-100 text-gray-500',   icon: '⏰', label: 'Expired' },
-  };
-
-  // Overall case status badge
   const statusBadge = {
-    active:      'bg-gray-100 text-gray-600',
-    cascading:   'bg-amber-100 text-amber-700',
-    confirmed:   'bg-green-100 text-green-700',
-    in_progress: 'bg-blue-100 text-blue-700',
-    completed:   'bg-teal-100 text-teal-700',
-    cancelled:   'bg-red-100 text-red-600',
-    unfilled:    'bg-red-100 text-red-600',
+    draft:      'bg-gray-100 text-gray-600',
+    active:     'bg-blue-100 text-blue-700',
+    cascading:  'bg-amber-100 text-amber-700',
+    confirmed:  'bg-green-100 text-green-700',
+    unfilled:   'bg-red-100 text-red-600',
+    completed:  'bg-teal-100 text-teal-700',
+    cancelled:  'bg-gray-100 text-gray-500',
   };
 
   const statusLabel = {
-    active:      'Draft',
-    cascading:   'Awaiting Response',
-    confirmed:   'Confirmed',
-    in_progress: 'In Progress',
-    completed:   'Completed',
-    cancelled:   'Cancelled',
-    unfilled:    'Unfilled — No Response',
+    draft:      'Draft',
+    active:     'Active — Pending Shortlist',
+    cascading:  'Cascading — Awaiting Response',
+    confirmed:  'Confirmed',
+    unfilled:   'Unfilled — No Response',
+    completed:  'Completed',
+    cancelled:  'Cancelled',
   };
 
-  // ── IS SURGERY DAY ─────────────────────────────────────────────────────────
   const isSurgeryDay = () => {
     if (!caseData?.surgery_date) return false;
-    const today = new Date().toISOString().split('T')[0];
-    return caseData.surgery_date === today;
+    return caseData.surgery_date === new Date().toISOString().split('T')[0];
   };
 
-  // ── CONFIRMED SURGEON ──────────────────────────────────────────────────────
   const confirmedSurgeon = priorityList.find(row => row.status === 'accepted')?.surgeons;
 
+  // ── LOADING / ERROR ────────────────────────────────────────────────────────
+  if (loading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <p className="text-gray-400">Loading case details...</p>
+    </div>
+  );
+
+  if (error || !caseData) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-red-500 mb-4">{error || 'Case not found'}</p>
+        <button onClick={() => navigate('/dashboard')} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+          Back to Dashboard
+        </button>
+      </div>
+    </div>
+  );
+
   // ── RENDER ─────────────────────────────────────────────────────────────────
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-400">Loading case details...</p>
-      </div>
-    );
-  }
-
-  if (error || !caseData) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error || 'Case not found'}</p>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ── TOP NAVIGATION ── */}
+      {/* ── NAV ── */}
       <nav className="bg-blue-900 px-8 py-4 flex items-center justify-between">
         <h1 className="text-white font-bold text-xl">
           Surgeon <span className="text-blue-300">on Call</span>
         </h1>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="text-blue-300 hover:text-white text-sm transition"
-        >
+        <button onClick={() => navigate('/dashboard')} className="text-blue-300 hover:text-white text-sm transition">
           ← Back to Dashboard
         </button>
       </nav>
@@ -187,7 +229,7 @@ export default function CaseDetail() {
       <div className="max-w-4xl mx-auto px-6 py-8">
 
         {/* ── PAGE HEADING ── */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-start justify-between mb-6">
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h2 className="text-2xl font-bold text-blue-900">
@@ -200,208 +242,362 @@ export default function CaseDetail() {
             <p className="text-gray-500 text-sm">{caseData.procedure}</p>
           </div>
 
-          {/* GPS button — only on surgery day when confirmed */}
-          {isSurgeryDay() && caseData.status === 'confirmed' && (
+          {/* Action buttons */}
+          <div className="flex items-center gap-2">
+            {/* Edit button */}
             <button
-              onClick={() => navigate(`/cases/${caseId}/gps`)}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+              onClick={openEditModal}
+              className="bg-white border border-gray-200 hover:border-blue-400 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
             >
-              📍 Track Surgeon
+              ✏️ Edit
             </button>
-          )}
+
+            {/* Delete button */}
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="bg-white border border-gray-200 hover:border-red-400 text-gray-700 hover:text-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+            >
+              🗑️ Delete
+            </button>
+
+            {/* GPS button — only on surgery day */}
+            {isSurgeryDay() && caseData.status === 'confirmed' && (
+              <button
+                onClick={() => navigate(`/cases/${caseId}/gps`)}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+              >
+                📍 Track Surgeon
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-6">
 
-          {/* ── LEFT COLUMN: Case details + Confirmed surgeon ── */}
+          {/* ── LEFT COLUMN ── */}
           <div className="col-span-1 flex flex-col gap-4">
 
             {/* Case Summary Card */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-4">
-                Case Details
-              </h3>
+              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-4">Case Details</h3>
               <div className="flex flex-col gap-3">
-                <div>
-                  <div className="text-xs text-gray-400">Procedure</div>
-                  <div className="text-sm font-medium text-gray-800">{caseData.procedure}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400">Specialty</div>
-                  <div className="text-sm font-medium text-gray-800">{caseData.specialty_required}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400">Surgery Date</div>
-                  <div className="text-sm font-medium text-gray-800">{formatDate(caseData.surgery_date)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400">Surgery Time</div>
-                  <div className="text-sm font-medium text-gray-800">{caseData.surgery_time}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400">OT Number</div>
-                  <div className="text-sm font-medium text-gray-800">{caseData.ot_number}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400">Patient</div>
-                  <div className="text-sm font-medium text-gray-800">
-                    {caseData.patient_name}, {caseData.patient_age}y ({caseData.patient_gender})
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400">Fee Budget</div>
-                  <div className="text-sm font-medium text-gray-800">
-                    {formatFee(caseData.fee_min)} – {formatFee(caseData.fee_max)}
-                  </div>
-                </div>
-                {caseData.notes && (
-                  <div>
-                    <div className="text-xs text-gray-400">Notes</div>
-                    <div className="text-sm text-gray-600">{caseData.notes}</div>
-                  </div>
-                )}
+                <Field label="Procedure"  value={caseData.procedure} />
+                <Field label="Specialty"  value={caseData.specialty_required} />
+                <Field label="Date"       value={formatDate(caseData.surgery_date)} />
+                <Field label="Time"       value={caseData.surgery_time} />
+                <Field label="Duration"   value={`${caseData.duration_hours} hrs`} />
+                <Field label="OT Number"  value={`OT ${caseData.ot_number}`} />
+                <Field label="Fee Range"  value={`${formatFee(caseData.fee_min)} – ${formatFee(caseData.fee_max)}`} />
               </div>
             </div>
 
-            {/* Confirmed Surgeon Card — shown once accepted */}
+            {/* Patient Card */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-4">Patient</h3>
+              <div className="flex flex-col gap-3">
+                <Field label="Age"    value={`${caseData.patient_age} yrs`} />
+                <Field label="Gender" value={caseData.patient_gender} />
+                {caseData.notes && <Field label="Notes" value={caseData.notes} />}
+              </div>
+            </div>
+
+            {/* Confirmed Surgeon Card */}
             {confirmedSurgeon && (
               <div className="bg-green-50 rounded-xl border border-green-200 p-5">
-                <h3 className="font-semibold text-green-700 text-sm uppercase tracking-wide mb-3">
-                  ✅ Confirmed Surgeon
-                </h3>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center
-                    text-white font-bold text-lg flex-shrink-0">
-                    {confirmedSurgeon.name.split(' ').slice(-2).map(n => n[0]).join('')}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-800">{confirmedSurgeon.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {confirmedSurgeon.experience_years} yrs · ⭐ {confirmedSurgeon.rating}
-                    </div>
-                    <div className="text-xs text-gray-500">{confirmedSurgeon.city}</div>
-                  </div>
-                </div>
-                <p className="text-xs text-green-600 mt-3">
-                  Our associate will contact you shortly to confirm logistics.
-                </p>
-              </div>
-            )}
-
-            {/* Unfilled state */}
-            {caseData.status === 'unfilled' && (
-              <div className="bg-red-50 rounded-xl border border-red-200 p-5">
-                <h3 className="font-semibold text-red-600 text-sm mb-2">No Surgeons Available</h3>
-                <p className="text-xs text-red-500">
-                  All surgeons in your priority list have declined or not responded.
-                  Our team will reach out to you with alternatives.
-                </p>
-                <button
-                  onClick={() => navigate('/new-request')}
-                  className="mt-3 w-full bg-red-600 text-white text-xs font-semibold py-2 rounded-lg"
-                >
-                  Post New Request
-                </button>
+                <h3 className="font-semibold text-green-800 text-sm uppercase tracking-wide mb-3">✅ Confirmed Surgeon</h3>
+                <p className="font-bold text-green-900">{confirmedSurgeon.name}</p>
+                <p className="text-green-700 text-sm mt-1">{confirmedSurgeon.specialty?.join(', ')}</p>
+                <p className="text-green-600 text-sm">{confirmedSurgeon.city}</p>
+                <p className="text-green-600 text-sm mt-1">⭐ {confirmedSurgeon.rating} · {confirmedSurgeon.experience_years} yrs exp</p>
               </div>
             )}
           </div>
 
-          {/* ── RIGHT COLUMN: Cascade Tracker ── */}
+          {/* ── RIGHT COLUMN: Cascade tracker ── */}
           <div className="col-span-2">
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">
-                  Surgeon Request Cascade
-                </h3>
-                {/* Live countdown for currently notified surgeon */}
-                {timeLeft && caseData.status === 'cascading' && (
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200
-                    px-3 py-1.5 rounded-lg">
-                    <span className="text-xs text-amber-600 font-medium">Next cascade in</span>
-                    <span className="text-sm font-bold text-amber-700 font-mono">{timeLeft}</span>
+                <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Surgeon Cascade</h3>
+                {timeLeft && (
+                  <div className="text-right">
+                    <div className="text-xs text-gray-400">Waiting for response</div>
+                    <div className="text-lg font-mono font-bold text-amber-600">{timeLeft}</div>
                   </div>
                 )}
               </div>
 
               {priorityList.length === 0 ? (
-                <p className="text-gray-400 text-sm">No priority list set yet.</p>
+                <div className="text-center py-8">
+                  <p className="text-gray-400 text-sm">No surgeons notified yet.</p>
+                  {caseData.status === 'active' && (
+                    <button
+                      onClick={() => navigate(`/cases/${caseId}/shortlist`)}
+                      className="mt-4 bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-semibold transition"
+                    >
+                      Select Surgeons →
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {priorityList.map((row, index) => {
-                    const style = cascadeStyles[row.status] || cascadeStyles.pending;
-                    const surgeon = row.surgeons;
-
-                    return (
-                      <div
-                        key={row.id}
-                        className={`flex items-center gap-4 p-4 rounded-xl border
-                          ${row.status === 'notified' ? 'border-amber-300' : 'border-gray-100'}
-                          ${style.bg}`}
-                      >
-                        {/* Priority number */}
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center
-                          text-sm font-bold flex-shrink-0
-                          ${row.status === 'accepted' ? 'bg-green-500 text-white'
-                            : row.status === 'notified' ? 'bg-amber-400 text-white'
-                            : row.status === 'declined' || row.status === 'expired' ? 'bg-gray-300 text-gray-500'
-                            : 'bg-gray-200 text-gray-500'}`}>
-                          {index + 1}
-                        </div>
-
-                        {/* Surgeon info */}
-                        <div className="flex-1">
-                          {surgeon ? (
-                            <>
-                              <div className={`font-semibold text-sm ${style.text}`}>
-                                {surgeon.name}
-                              </div>
-                              <div className="text-xs text-gray-400 mt-0.5">
-                                {surgeon.experience_years} yrs · ⭐ {surgeon.rating || 'New'} · {surgeon.city}
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-sm text-gray-500">Surgeon details loading...</div>
-                          )}
-                        </div>
-
-                        {/* Status badge */}
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${style.badge}`}>
-                            {style.icon} {style.label}
-                          </span>
-                          {row.status === 'notified' && row.expires_at && (
-                            <span className="text-xs text-amber-500">
-                              Expires: {new Date(row.expires_at).toLocaleTimeString('en-IN', {
-                                hour: '2-digit', minute: '2-digit'
-                              })}
-                            </span>
-                          )}
-                          {row.responded_at && (
-                            <span className="text-xs text-gray-400">
-                              {new Date(row.responded_at).toLocaleTimeString('en-IN', {
-                                hour: '2-digit', minute: '2-digit'
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {priorityList.map((row, index) => (
+                    <CascadeRow key={row.id} row={row} index={index} />
+                  ))}
                 </div>
               )}
-
-              {/* How cascade works explanation */}
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                <p className="text-xs text-blue-600">
-                  <strong>How it works:</strong> Request is sent to Priority 1 first.
-                  If they don't respond within 2 hours or decline,
-                  it automatically moves to Priority 2, and so on.
-                </p>
-              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ── EDIT MODAL ── */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">Edit Case — SOC-{String(caseData.case_number).padStart(3, '0')}</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+
+            {/* Modal body */}
+            <div className="p-6 flex flex-col gap-5">
+
+              {saveError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+                  {saveError}
+                </div>
+              )}
+
+              {/* Surgery details section */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Surgery Details</h4>
+                <div className="grid grid-cols-2 gap-4">
+
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Procedure Name</label>
+                    <input
+                      type="text"
+                      value={editForm.procedure}
+                      onChange={e => setEditForm({...editForm, procedure: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Specialty Required</label>
+                    <select
+                      value={editForm.specialty_required}
+                      onChange={e => setEditForm({...editForm, specialty_required: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    >
+                      {SPECIALTY_OPTIONS.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Surgery Date</label>
+                    <input
+                      type="date"
+                      value={editForm.surgery_date}
+                      onChange={e => setEditForm({...editForm, surgery_date: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Surgery Time</label>
+                    <input
+                      type="time"
+                      value={editForm.surgery_time}
+                      onChange={e => setEditForm({...editForm, surgery_time: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Duration (hours)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={editForm.duration_hours}
+                      onChange={e => setEditForm({...editForm, duration_hours: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">OT Number</label>
+                    <input
+                      type="text"
+                      value={editForm.ot_number}
+                      onChange={e => setEditForm({...editForm, ot_number: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Min Fee (₹)</label>
+                    <input
+                      type="number"
+                      value={editForm.fee_min}
+                      onChange={e => setEditForm({...editForm, fee_min: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Max Fee (₹)</label>
+                    <input
+                      type="number"
+                      value={editForm.fee_max}
+                      onChange={e => setEditForm({...editForm, fee_max: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Patient details section */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Patient Details</h4>
+                <div className="grid grid-cols-2 gap-4">
+
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Patient Name</label>
+                    <input
+                      type="text"
+                      value={editForm.patient_name}
+                      onChange={e => setEditForm({...editForm, patient_name: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Age</label>
+                    <input
+                      type="number"
+                      value={editForm.patient_age}
+                      onChange={e => setEditForm({...editForm, patient_age: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Gender</label>
+                    <select
+                      value={editForm.patient_gender}
+                      onChange={e => setEditForm({...editForm, patient_gender: e.target.value})}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Clinical Notes</label>
+                    <textarea
+                      value={editForm.notes}
+                      onChange={e => setEditForm({...editForm, notes: e.target.value})}
+                      rows={3}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white px-6 py-2 rounded-lg text-sm font-semibold transition"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE CONFIRMATION MODAL ── */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Case?</h3>
+            <p className="text-gray-500 text-sm mb-6">
+              This will permanently delete <strong>SOC-{String(caseData.case_number).padStart(3, '0')} — {caseData.procedure}</strong> and all associated data. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg text-sm font-semibold transition"
+              >
+                {deleting ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── HELPER COMPONENTS ──────────────────────────────────────────────────────────
+
+function Field({ label, value }) {
+  return (
+    <div>
+      <div className="text-xs text-gray-400">{label}</div>
+      <div className="text-sm font-medium text-gray-800">{value || '—'}</div>
+    </div>
+  );
+}
+
+function CascadeRow({ row, index }) {
+  const statusConfig = {
+    pending:  { bg: 'bg-gray-50',   border: 'border-gray-200', badge: 'bg-gray-100 text-gray-500',   label: 'Pending' },
+    notified: { bg: 'bg-amber-50',  border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', label: '⏳ Waiting' },
+    accepted: { bg: 'bg-green-50',  border: 'border-green-200', badge: 'bg-green-100 text-green-700', label: '✅ Accepted' },
+    declined: { bg: 'bg-red-50',    border: 'border-red-200',   badge: 'bg-red-100 text-red-600',     label: '✗ Declined' },
+    expired:  { bg: 'bg-gray-50',   border: 'border-gray-200', badge: 'bg-gray-100 text-gray-500',   label: 'Expired' },
+  };
+
+  const config = statusConfig[row.status] || statusConfig.pending;
+
+  return (
+    <div className={`flex items-center justify-between p-4 rounded-xl border ${config.bg} ${config.border}`}>
+      <div className="flex items-center gap-3">
+        <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">
+          {index + 1}
+        </div>
+        <div>
+          <p className="font-semibold text-gray-800 text-sm">{row.surgeons?.name || '—'}</p>
+          <p className="text-xs text-gray-400">{row.surgeons?.specialty?.join(', ')}</p>
+        </div>
+      </div>
+      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}>
+        {config.label}
+      </span>
     </div>
   );
 }

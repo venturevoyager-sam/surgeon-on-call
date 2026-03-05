@@ -14,7 +14,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../supabase');
 const logger = require('../logger');
-
+const { notifyNewCase, notifyCasePassed } = require('../notifications');
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/cases
 // Create a new surgery request and run the matching algorithm
@@ -384,6 +384,97 @@ router.patch('/:id/priority', async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/cases/:id
+// Update case details — works for all case statuses
+// Called by: CaseDetail page — Edit modal
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:id', async (req, res) => {
+  const { id } = req.params;
+  const {
+    procedure, specialty_required, surgery_date, surgery_time,
+    duration_hours, ot_number, fee_min, fee_max,
+    patient_name, patient_age, patient_gender, notes,
+  } = req.body;
+
+  logger.info('Updating case', { case_id: id });
+
+  try {
+    // Build update object — only include fields that were sent
+    const updates = {};
+    if (procedure          !== undefined) updates.procedure          = procedure;
+    if (specialty_required !== undefined) updates.specialty_required = specialty_required;
+    if (surgery_date       !== undefined) updates.surgery_date       = surgery_date;
+    if (surgery_time       !== undefined) updates.surgery_time       = surgery_time;
+    if (duration_hours     !== undefined) updates.duration_hours     = duration_hours;
+    if (ot_number          !== undefined) updates.ot_number          = ot_number;
+    if (fee_min            !== undefined) updates.fee_min            = fee_min;
+    if (fee_max            !== undefined) updates.fee_max            = fee_max;
+    if (patient_name       !== undefined) updates.patient_name       = patient_name;
+    if (patient_age        !== undefined) updates.patient_age        = patient_age;
+    if (patient_gender     !== undefined) updates.patient_gender     = patient_gender;
+    if (notes              !== undefined) updates.notes              = notes;
+    updates.updated_at = new Date().toISOString();
+
+    const { data: case_, error } = await supabase
+      .from('cases')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Failed to update case', { error: error.message });
+      throw error;
+    }
+
+    logger.info('Case updated successfully', { case_id: id });
+    return res.json({ message: 'Case updated successfully', case: case_ });
+
+  } catch (error) {
+    logger.error('Error updating case', { error: error.message });
+    return res.status(500).json({ message: 'Failed to update case' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/cases/:id
+// Delete a case and its priority list entries
+// Called by: CaseDetail page — Delete button
+// ─────────────────────────────────────────────────────────────────────────────
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  logger.info('Deleting case', { case_id: id });
+
+  try {
+    // Delete priority list entries first (foreign key constraint)
+    await supabase
+      .from('case_priority_list')
+      .delete()
+      .eq('case_id', id);
+
+    // Delete the case
+    const { error } = await supabase
+      .from('cases')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      logger.error('Failed to delete case', { error: error.message });
+      throw error;
+    }
+
+    logger.info('Case deleted successfully', { case_id: id });
+    return res.json({ message: 'Case deleted successfully' });
+
+  } catch (error) {
+    logger.error('Error deleting case', { error: error.message });
+    return res.status(500).json({ message: 'Failed to delete case' });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TRIGGER CASCADE
 // Notifies the next surgeon in the priority list
@@ -438,7 +529,30 @@ async function triggerCascade(caseId) {
       expires_at:     expiresAt.toISOString(),
     });
 
-    // TODO Sprint 5: Send SMS/WhatsApp/Push notification to surgeon here
+    // ── Send WhatsApp/SMS notification to the surgeon ──────────────────────────
+    // First surgeon in cascade gets "new case" message,
+    // subsequent surgeons get "case passed" message
+    const isFirstSurgeon = nextRow.priority_order === 1;
+
+    const caseDetails = await supabase
+      .from('cases')
+      .select('procedure, surgery_date, surgery_time, fee_max')
+      .eq('id', caseId)
+      .single();
+
+    if (caseDetails.data && nextRow.surgeons?.phone) {
+      console.log('=== Firing notification to:', nextRow.surgeons.phone); // ADD THIS
+      const notifyFn = isFirstSurgeon ? notifyNewCase : notifyCasePassed;
+      await notifyFn({
+        surgeonName:  nextRow.surgeons.name,
+        surgeonPhone: nextRow.surgeons.phone,
+        procedure:    caseDetails.data.procedure,
+        surgeryDate:  caseDetails.data.surgery_date,
+        surgeryTime:  caseDetails.data.surgery_time,
+        feeMax:       caseDetails.data.fee_max,
+        expiresAt:    expiresAt.toISOString(),
+      });
+    }
 
   } catch (error) {
     logger.error('Error in cascade trigger', { error: error.message });
@@ -455,13 +569,14 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
     logger.info('Matching: querying verified surgeons', { specialty_required });
 
     // Find all verified, available surgeons with the required specialty
+    // Uses PostgREST 'cs' (contains) operator for array column matching
     const { data: surgeons, error } = await supabase
       .from('surgeons')
       .select('*')
       .eq('verified', true)
       .eq('available', true)
       .eq('status', 'active')
-      .contains('specialty', [specialty_required]);
+      .filter('specialty', 'cs', `{"${specialty_required}"}`);
 
     if (error) {
       logger.error('Matching: surgeon query failed', { error: error.message });
@@ -469,41 +584,50 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
     }
 
     logger.info('Matching: surgeons found before conflict check', {
-      count: surgeons?.length || 0
+      count: surgeons?.length || 0,
     });
 
     if (!surgeons || surgeons.length === 0) return [];
 
-    // Filter out surgeons with conflicting cases on same date and time
+    // Filter out surgeons with conflicting confirmed cases on the same date
     const availableSurgeons = [];
     for (const surgeon of surgeons) {
-      const { data: conflicts } = await supabase
-        .from('cases')
-        .select('id')
-        .eq('confirmed_surgeon_id', surgeon.id)
-        .eq('surgery_date', surgery_date)
-        .in('status', ['confirmed', 'in_progress']);
+      try {
+        const { data: conflictData } = await supabase
+          .from('cases')
+          .select('id')
+          .eq('confirmed_surgeon_id', surgeon.id)
+          .eq('surgery_date', surgery_date)
+          .in('status', ['confirmed', 'in_progress']);
 
-      if (!conflicts || conflicts.length === 0) {
-        availableSurgeons.push(surgeon);
-      } else {
-        logger.debug('Surgeon has conflict on requested date, excluded', {
+        if (!conflictData || conflictData.length === 0) {
+          availableSurgeons.push(surgeon);
+        } else {
+          logger.debug('Surgeon has conflict on requested date, excluded', {
+            surgeon_name: surgeon.name,
+            surgery_date,
+          });
+        }
+      } catch (conflictErr) {
+        // If conflict check fails, include the surgeon anyway
+        logger.warn('Conflict check failed for surgeon, including anyway', {
           surgeon_name: surgeon.name,
-          surgery_date,
+          error: conflictErr.message,
         });
+        availableSurgeons.push(surgeon);
       }
     }
 
     logger.info('Matching: surgeons available after conflict check', {
-      count: availableSurgeons.length
+      count: availableSurgeons.length,
     });
 
     // Score each surgeon based on matching criteria
     const scoredSurgeons = availableSurgeons.map(surgeon => {
       let score = 0;
 
-      // City match: same city gets big boost
-      if (surgeon.city.toLowerCase() === city.toLowerCase()) {
+      // City match: same city as hospital gets big boost
+      if (surgeon.city && city && surgeon.city.toLowerCase() === city.toLowerCase()) {
         score += 50;
       }
 
@@ -511,7 +635,7 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
       score += (surgeon.rating || 0) * 10;
 
       // Experience on platform: more cases = slight boost (max 20 points)
-      score += Math.min(surgeon.total_cases / 10, 20);
+      score += Math.min((surgeon.total_cases || 0) / 10, 20);
 
       return { ...surgeon, match_score: score };
     });
@@ -522,7 +646,7 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
 
     logger.info('Matching complete', {
       total_matched: topSurgeons.length,
-      top_surgeon: topSurgeons[0]?.name || 'none',
+      top_surgeon:   topSurgeons[0]?.name || 'none',
     });
 
     return topSurgeons;

@@ -38,7 +38,7 @@ export default function RequestDetailScreen({ navigation, route }) {
   // ── GET CASE ID FROM NAVIGATION ────────────────────────────────────────────
   // HomeScreen passes the caseId when navigating here:
   // navigation.navigate('RequestDetail', { caseId: '...' })
-  const { caseId } = route.params;
+  const { caseId, surgeonId } = route.params;
 
   // ── STATE ──────────────────────────────────────────────────────────────────
 
@@ -66,7 +66,8 @@ export default function RequestDetailScreen({ navigation, route }) {
         console.log('RequestDetail: Fetching case:', caseId);
 
         const response = await axios.get(
-          `${CONFIG.API_URL}/api/cases/${caseId}/surgeon-view`
+          `${CONFIG.API_URL}/api/cases/${caseId}/surgeon-view`,
+          { params: { surgeon_id: surgeonId } }
         );
         setCaseData(response.data.case);
         console.log('RequestDetail: Case loaded:', response.data.case.procedure);
@@ -137,7 +138,7 @@ export default function RequestDetailScreen({ navigation, route }) {
 
               await axios.patch(
                 `${CONFIG.API_URL}/api/cases/${caseId}/accept`,
-                { surgeon_id: CONFIG.DEV_SURGEON_ID }
+                { surgeon_id: surgeonId  }
               );
 
               console.log('RequestDetail: Case accepted successfully');
@@ -184,7 +185,7 @@ export default function RequestDetailScreen({ navigation, route }) {
 
               await axios.patch(
                 `${CONFIG.API_URL}/api/cases/${caseId}/decline`,
-                { surgeon_id: CONFIG.DEV_SURGEON_ID }
+                { surgeon_id: surgeonId }
               );
 
               console.log('RequestDetail: Case declined');

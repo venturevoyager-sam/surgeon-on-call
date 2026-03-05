@@ -28,6 +28,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../supabase');
 const logger = require('../logger');
+const { notifyCasePassed } = require('../notifications');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/surgeons/:id
@@ -465,7 +466,23 @@ async function triggerCascade(caseId) {
       priority_order: nextRow.priority_order,
     });
 
-    // TODO Sprint 5: Send SMS/WhatsApp/Push notification here
+    // Send WhatsApp/SMS notification to the next surgeon
+    const caseDetails = await supabase
+      .from('cases')
+      .select('procedure, surgery_date, surgery_time, fee_max')
+      .eq('id', caseId)
+      .single();
+
+    if (caseDetails.data && nextRow.surgeons?.phone) {
+      await notifyCasePassed({
+        surgeonName:  nextRow.surgeons.name,
+        surgeonPhone: nextRow.surgeons.phone,
+        procedure:    caseDetails.data.procedure,
+        surgeryDate:  caseDetails.data.surgery_date,
+        surgeryTime:  caseDetails.data.surgery_time,
+        feeMax:       caseDetails.data.fee_max,
+      });
+    }
 
   } catch (error) {
     logger.error('Error in cascade', { error: error.message });
@@ -647,42 +664,63 @@ router.post('/login', async (req, res) => {
       });
 
     } else {
-      // ── NEW SURGEON: auto-register ─────────────────────────────────────────
-      logger.info('Surgeon login: new surgeon, auto-registering', { phone: cleanPhone });
+      // ── NO AUTH RECORD FOUND ───────────────────────────────────────────────
+      // Either brand new surgeon, or existing surgeon without auth record.
+      // Check if surgeon already exists in surgeons table by phone.
+      logger.info('Surgeon login: no auth record, checking surgeons table', { phone: cleanPhone });
 
-      // Hash the password before storing
       const passwordHash = await bcrypt.hash(password, 10);
 
-      // Create surgeon record
-      const { data: newSurgeon, error: surgeonCreateError } = await supabase
+      const { data: existingSurgeon } = await supabase
         .from('surgeons')
-        .insert({
-          name:             `Dr. (${cleanPhone})`,  // Placeholder name until profile is set up
-          phone:            cleanPhone,
-          specialty:        [],
-          verified:         false,   // Admin must verify new surgeons
-          available:        false,   // Not available until verified
-          rating:           0,
-          total_cases:      0,
-          experience_years: 0,
-          mci_number:       'PENDING',
-          city:             'Not set',
-          bio:              '',
-
-        })
-        .select()
+        .select('id, name, phone, verified, available')
+        .eq('phone', cleanPhone)
         .single();
 
-      if (surgeonCreateError) {
-        logger.error('Surgeon login: failed to create surgeon', { error: surgeonCreateError.message });
-        return res.status(500).json({  message: surgeonCreateError.message  });
+      let surgeonRecord;
+
+      if (existingSurgeon) {
+        // ── EXISTING SURGEON: just create auth record ──────────────────────
+        logger.info('Surgeon login: existing surgeon found, creating auth record', {
+          name: existingSurgeon.name,
+        });
+        surgeonRecord = existingSurgeon;
+
+      } else {
+        // ── BRAND NEW SURGEON: create surgeon + auth record ────────────────
+        logger.info('Surgeon login: new surgeon, auto-registering', { phone: cleanPhone });
+
+        const { data: newSurgeon, error: surgeonCreateError } = await supabase
+          .from('surgeons')
+          .insert({
+            name:             `Dr. (${cleanPhone})`,
+            phone:            cleanPhone,
+            specialty:        [],
+            verified:         false,
+            available:        false,
+            rating:           0,
+            total_cases:      0,
+            experience_years: 0,
+            mci_number:       'PENDING',
+            city:             'Not set',
+            bio:              '',
+          })
+          .select()
+          .single();
+
+        if (surgeonCreateError) {
+          logger.error('Surgeon login: failed to create surgeon', { error: surgeonCreateError.message });
+          return res.status(500).json({ message: surgeonCreateError.message });
+        }
+
+        surgeonRecord = newSurgeon;
       }
 
-      // Create auth record
+      // Create auth record for either existing or new surgeon
       const { error: authCreateError } = await supabase
         .from('surgeon_auth')
         .insert({
-          surgeon_id:    newSurgeon.id,
+          surgeon_id:    surgeonRecord.id,
           phone:         cleanPhone,
           password_hash: passwordHash,
         });
@@ -692,18 +730,18 @@ router.post('/login', async (req, res) => {
         return res.status(500).json({ message: 'Failed to create account' });
       }
 
-      logger.info('Surgeon login: new surgeon registered', {
-        surgeon_id: newSurgeon.id,
-        phone:      cleanPhone,
+      logger.info('Surgeon login: auth record created', {
+        surgeon_id: surgeonRecord.id,
+        name:       surgeonRecord.name,
       });
 
       return res.status(201).json({
-        message:   'Account created successfully',
-        surgeon_id: newSurgeon.id,
-        name:       newSurgeon.name,
+        message:    'Account created successfully',
+        surgeon_id: surgeonRecord.id,
+        name:       surgeonRecord.name,
         phone:      cleanPhone,
-        verified:   false,
-        available:  false,
+        verified:   surgeonRecord.verified,
+        available:  surgeonRecord.available,
       });
     }
 
