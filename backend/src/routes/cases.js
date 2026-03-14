@@ -315,9 +315,9 @@ router.patch('/:id/priority', async (req, res) => {
     });
 
     // Validate priority list
-    if (!priority_list || !Array.isArray(priority_list) || priority_list.length < 3) {
+    if (!priority_list || !Array.isArray(priority_list) || priority_list.length < 1) {
       return res.status(400).json({
-        message: 'Priority list must contain at least 3 surgeon IDs'
+        message: 'Priority list must contain at least 1 surgeon IDs'
       });
     }
 
