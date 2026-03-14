@@ -44,11 +44,18 @@ export default function Dashboard() {
    */
  useEffect(() => {
   const getUser = async () => {
-    // ── DEV MODE ────────────────────────────────────────────────────────────
-    const devEmail = 'venturevoyager.sam@gmail.com';
-    console.log('DEV_MODE: Using hardcoded email:', devEmail);
-    setUser({ email: devEmail });
-    fetchCases(devEmail);
+    // Get the real logged-in user from Supabase Auth
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      // No session — send them back to login
+      navigate('/');
+      return;
+    }
+
+    const email = session.user.email;
+    setUser({ email });
+    fetchCases(email);
   };
   getUser();
 }, [navigate]);

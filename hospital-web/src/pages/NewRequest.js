@@ -94,23 +94,31 @@ export default function NewRequest() {
    */
   useEffect(() => {
   const getHospital = async () => {
-    // ── DEV MODE ────────────────────────────────────────────────────────────
-    // Hardcode the email so we don't need to log in during development
-    const devEmail = 'venturevoyager.sam@gmail.com';
-    console.log('DEV_MODE: Using hardcoded email:', devEmail);
+    // Get the real logged-in user from Supabase Auth
+    const { data: { session } } = await supabase.auth.getSession();
+
+    // If no session, send back to login
+    if (!session) {
+      console.log('No session found, redirecting to login');
+      navigate('/');
+      return;
+    }
+
+    const email = session.user.email;
+    console.log('Logged in as:', email);
 
     // Find hospital record by SPOC email
     const { data: hospital, error } = await supabase
       .from('hospitals')
       .select('*')
-      .eq('contact_email', devEmail)
+      .eq('contact_email', email)
       .single();
 
     console.log('Hospital found:', hospital);
     console.log('Hospital error:', error);
 
     if (error || !hospital) {
-      console.error('Hospital not found for email:', devEmail);
+      console.error('Hospital not found for email:', email);
       navigate('/dashboard');
       return;
     }
