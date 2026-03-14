@@ -113,7 +113,7 @@ export default function Shortlist() {
    */
   const sendRequests = async () => {
     if (priorityList.length < 3) {
-      setError('Please select at least 3 surgeons before sending');
+      setError('Please select at least 1 surgeons before sending');
       return;
     }
 
@@ -414,7 +414,7 @@ export default function Shortlist() {
               {/* Minimum selection hint */}
               {priorityList.length > 0 && priorityList.length < 3 && (
                 <p className="text-xs text-amber-600 text-center mt-4">
-                  Select at least {3 - priorityList.length} more surgeon{3 - priorityList.length > 1 ? 's' : ''} to continue
+                  Select at least {1 - priorityList.length} more surgeon{1 - priorityList.length > 1 ? 's' : ''} to continue
                 </p>
               )}
             </div>

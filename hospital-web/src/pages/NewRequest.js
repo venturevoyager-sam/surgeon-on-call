@@ -163,9 +163,9 @@ export default function NewRequest() {
       // Surgery must be at least 48 hours from now
       const surgeryDate = new Date(form.surgery_date);
       const minDate = new Date();
-      minDate.setHours(minDate.getHours() + 48);
+      minDate.setHours(minDate.getHours() + 6);
       if (surgeryDate < minDate)
-        newErrors.surgery_date = 'Surgery date must be at least 48 hours from now';
+        newErrors.surgery_date = 'Surgery date must be at least 6 hours from now';
     }
 
     if (!form.surgery_time)
