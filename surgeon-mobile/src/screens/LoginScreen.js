@@ -77,14 +77,14 @@ export default function LoginScreen({ onLogin }) {
   };
 
   // ── DEV MODE QUICK LOGIN ───────────────────────────────────────────────────
-  // Logs in directly as Dr. Arjun Mehta without going through the API.
+  // Logs in directly as Dr. Samdhathri Dontaraju without going through the API.
   // Remove before production.
   const handleDevLogin = () => {
-    console.log('DEV: Logging in as Dr. Arjun Mehta');
+    console.log('DEV: Logging in as Dr. Samdhathri Dontaraju');
     onLogin({
       surgeon_id: CONFIG.DEV_SURGEON_ID,
-      name:       'Dr. Arjun Mehta',
-      phone:      '9999999999',
+      name:       'Dr. Samdhathri Dontaraju',
+      phone:      '8686269480',
     });
   };
 
