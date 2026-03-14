@@ -112,7 +112,7 @@ export default function Shortlist() {
    * This triggers the cascade — first surgeon gets notified immediately
    */
   const sendRequests = async () => {
-    if (priorityList.length < 3) {
+    if (priorityList.length < 1) {
       setError('Please select at least 1 surgeons before sending');
       return;
     }
@@ -393,7 +393,7 @@ export default function Shortlist() {
               )}
 
               {/* Send button */}
-              {priorityList.length >= 3 && (
+              {priorityList.length >= 1 && (
                 <div className="mt-4">
                   <button
                     onClick={sendRequests}
