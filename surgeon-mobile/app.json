@@ -21,7 +21,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B1F3A"
-      }
+      },
+      "package": "com.vaidhya.surgeononcall"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -29,6 +30,11 @@
     "plugins": [
       "expo-secure-store",
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c2b82b0d-e139-4c89-8a12-cf701e5b19a1"
+      }
+    }
   }
 }
