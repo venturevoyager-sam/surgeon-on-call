@@ -12,7 +12,7 @@ const CONFIG = {
   // The phone and computer must be on the SAME WiFi network.
   // If the app can't reach the backend, run `ipconfig` on your computer
   // and update this IP to match your current WiFi IPv4 address.
-  API_URL: 'http://192.168.1.8:5000',
+  API_URL: 'http://192.168.1.44:5000',
 
   // ── SUPABASE ───────────────────────────────────────────────────────────────
   // Your Supabase project credentials.
