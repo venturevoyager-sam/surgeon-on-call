@@ -2,22 +2,127 @@
  * CASES ROUTES - Backend API
  * Company: Vaidhya Healthcare Pvt Ltd
  *
- * Handles all API endpoints related to surgery cases:
- * - POST /api/cases              → Create a new surgery request
+ * Endpoints:
+ * - POST /api/cases/draft        → Create empty draft case with pre-assigned surgeon (NEW)
+ * - POST /api/cases              → Create a full new surgery request
  * - GET  /api/cases              → List cases for a hospital
- * - GET  /api/cases/:id          → Get a single case with full details
  * - GET  /api/cases/:id/matches  → Get matched surgeons for a case
+ * - GET  /api/cases/:id          → Get a single case with full details
  * - PATCH /api/cases/:id/priority → Save priority list and trigger cascade
+ * - PATCH /api/cases/:id         → Update case fields (now handles documents + status)
+ * - DELETE /api/cases/:id        → Delete a case
+ * - GET  /api/cases/:caseId/surgeon-view → Case detail for surgeon mobile app
+ * - PATCH /api/cases/:caseId/accept  → Surgeon accepts
+ * - PATCH /api/cases/:caseId/decline → Surgeon declines
  */
 
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 const supabase = require('../supabase');
-const logger = require('../logger');
+const logger   = require('../logger');
 const { notifyNewCase, notifyCasePassed } = require('../notifications');
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/cases/draft
+// Create a minimal "draft" case with a surgeon pre-assigned.
+// Called by: FindSurgeon page — "Book This Surgeon" button
+//
+// The case is created with status = 'draft' and confirmed_surgeon_id set.
+// All clinical fields (procedure, patient, date etc) are left null.
+// Hospital fills them in on the EditCase page, which then PATCHes this case.
+//
+// IMPORTANT: This route MUST be defined before POST / and before any /:id routes
+// so Express doesn't mistake "draft" for a case UUID.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/draft', async (req, res) => {
+  logger.info('Draft case creation requested', { body: req.body });
+
+  try {
+    const { hospital_id, pre_assigned_surgeon } = req.body;
+
+    if (!hospital_id) {
+      return res.status(400).json({ message: 'hospital_id is required' });
+    }
+    if (!pre_assigned_surgeon) {
+      return res.status(400).json({ message: 'pre_assigned_surgeon is required' });
+    }
+
+    // ── Verify hospital ────────────────────────────────────────────────────
+    const { data: hospital, error: hospitalError } = await supabase
+      .from('hospitals')
+      .select('id, name, city, verified')
+      .eq('id', hospital_id)
+      .single();
+
+    if (hospitalError || !hospital) {
+      return res.status(404).json({ message: 'Hospital not found' });
+    }
+
+    // ── Verify surgeon exists and is verified ──────────────────────────────
+    const { data: surgeon, error: surgeonError } = await supabase
+      .from('surgeons')
+      .select('id, name, verified, available')
+      .eq('id', pre_assigned_surgeon)
+      .single();
+
+    if (surgeonError || !surgeon) {
+      return res.status(404).json({ message: 'Surgeon not found' });
+    }
+
+    // ── Create the draft case ──────────────────────────────────────────────
+    // All clinical fields are null — hospital fills them in on the EditCase page
+    const { data: newCase, error: caseError } = await supabase
+      .from('cases')
+      .insert({
+        hospital_id,
+        confirmed_surgeon_id: pre_assigned_surgeon,
+        status:               'draft',
+        payment_status:       'pending',
+        // Clinical fields — intentionally null, filled later
+        procedure:          null,
+        specialty_required: null,
+        surgery_date:       null,
+        surgery_time:       null,
+        duration_hours:     null,
+        ot_number:          null,
+        patient_name:       null,
+        patient_age:        null,
+        patient_gender:     null,
+        fee_min:            null,
+        fee_max:            null,
+        notes:              null,
+        documents:          null,
+      })
+      .select()
+      .single();
+
+    if (caseError) {
+      logger.error('Failed to create draft case', { error: caseError.message });
+      return res.status(500).json({ message: 'Failed to create draft case' });
+    }
+
+    logger.info('Draft case created', {
+      case_id:  newCase.id,
+      hospital: hospital.name,
+      surgeon:  surgeon.name,
+    });
+
+    return res.status(201).json({
+      message: 'Draft case created',
+      case:    newCase,
+    });
+
+  } catch (error) {
+    logger.error('Error creating draft case', { error: error.message });
+    return res.status(500).json({ message: 'Something went wrong' });
+  }
+});
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/cases
-// Create a new surgery request and run the matching algorithm
+// Create a new full surgery request and run the matching algorithm
 // Called by: Hospital Web App — New Request form
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
@@ -38,14 +143,15 @@ router.post('/', async (req, res) => {
       fee_min,
       fee_max,
       notes,
+      documents,
     } = req.body;
 
-    // ── VALIDATION ────────────────────────────────────────────────────────────
+    // ── Validation ─────────────────────────────────────────────────────────
     const required = [
       'hospital_id', 'procedure', 'specialty_required',
       'surgery_date', 'surgery_time', 'duration_hours',
       'ot_number', 'patient_name', 'patient_age',
-      'patient_gender', 'fee_min', 'fee_max'
+      'patient_gender', 'fee_min', 'fee_max',
     ];
 
     for (const field of required) {
@@ -55,7 +161,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // ── VERIFY HOSPITAL ───────────────────────────────────────────────────────
+    // ── Verify hospital ────────────────────────────────────────────────────
     logger.info('Verifying hospital', { hospital_id });
 
     const { data: hospital, error: hospitalError } = await supabase
@@ -78,7 +184,7 @@ router.post('/', async (req, res) => {
 
     logger.info('Hospital verified', { hospital_name: hospital.name, city: hospital.city });
 
-    // ── SAVE CASE ─────────────────────────────────────────────────────────────
+    // ── Save case ──────────────────────────────────────────────────────────
     logger.info('Saving case to database');
 
     const { data: newCase, error: caseError } = await supabase
@@ -96,8 +202,9 @@ router.post('/', async (req, res) => {
         patient_gender,
         fee_min,
         fee_max,
-        notes: notes || null,
-        status: 'active',
+        notes:     notes     || null,
+        documents: documents || null,
+        status:         'active',
         payment_status: 'pending',
       })
       .select()
@@ -109,15 +216,15 @@ router.post('/', async (req, res) => {
     }
 
     logger.info('Case saved successfully', {
-      case_id: newCase.id,
+      case_id:     newCase.id,
       case_number: newCase.case_number,
-      procedure: newCase.procedure,
+      procedure:   newCase.procedure,
     });
 
-    // ── RUN MATCHING ──────────────────────────────────────────────────────────
+    // ── Run matching ───────────────────────────────────────────────────────
     logger.info('Running matching algorithm', {
       specialty: specialty_required,
-      city: hospital.city,
+      city:      hospital.city,
     });
 
     const matchedSurgeons = await matchSurgeons({
@@ -132,8 +239,8 @@ router.post('/', async (req, res) => {
     logger.info('Matching complete', { surgeons_found: matchedSurgeons.length });
 
     return res.status(201).json({
-      message: 'Case created successfully',
-      case: newCase,
+      message:          'Case created successfully',
+      case:             newCase,
       matched_surgeons: matchedSurgeons,
     });
 
@@ -145,6 +252,7 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ message: 'Something went wrong' });
   }
 });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cases
@@ -181,20 +289,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cases/:id/matches
 // Get matched surgeons for an existing case
 // Called by: Shortlist page on load
-// IMPORTANT: This route must be defined BEFORE GET /:id
-// because Express reads routes top to bottom —
-// if /:id is first, it will capture /matches as the id parameter
+//
+// IMPORTANT: Must be defined BEFORE GET /:id so Express doesn't treat
+// the literal string "matches" as a UUID parameter.
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:id/matches', async (req, res) => {
   try {
     const { id } = req.params;
     logger.info('Fetching matches for case', { case_id: id });
 
-    // Step 1: Get the case details
+    // Get the case
     const { data: case_, error: caseError } = await supabase
       .from('cases')
       .select('*')
@@ -206,7 +315,7 @@ router.get('/:id/matches', async (req, res) => {
       return res.status(404).json({ message: 'Case not found' });
     }
 
-    // Step 2: Get the hospital city separately
+    // Get hospital city
     const { data: hospital, error: hospitalError } = await supabase
       .from('hospitals')
       .select('city')
@@ -220,7 +329,7 @@ router.get('/:id/matches', async (req, res) => {
     const city = hospital?.city || '';
     logger.info('Fetched hospital city for matching', { city });
 
-    // Step 3: Run matching algorithm with case details
+    // Run matching
     const matchedSurgeons = await matchSurgeons({
       specialty_required: case_.specialty_required,
       surgery_date:       case_.surgery_date,
@@ -231,8 +340,8 @@ router.get('/:id/matches', async (req, res) => {
     });
 
     logger.info('Matches fetched', {
-      case_id: id,
-      matches_found: matchedSurgeons.length
+      case_id:       id,
+      matches_found: matchedSurgeons.length,
     });
 
     return res.json({ matched_surgeons: matchedSurgeons });
@@ -242,6 +351,7 @@ router.get('/:id/matches', async (req, res) => {
     return res.status(500).json({ message: 'Failed to fetch matches' });
   }
 });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cases/:id
@@ -253,7 +363,6 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     logger.info('Fetching case detail', { case_id: id });
 
-    // Fetch the case
     const { data: case_, error: caseError } = await supabase
       .from('cases')
       .select('*')
@@ -265,7 +374,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Case not found' });
     }
 
-    // Fetch the priority list for this case with surgeon details
+    // Fetch priority list with surgeon details
     const { data: priorityList, error: priorityError } = await supabase
       .from('case_priority_list')
       .select(`
@@ -284,12 +393,12 @@ router.get('/:id', async (req, res) => {
     }
 
     logger.info('Case detail fetched', {
-      case_id: id,
-      priority_list_count: priorityList?.length || 0
+      case_id:             id,
+      priority_list_count: priorityList?.length || 0,
     });
 
     return res.json({
-      case: case_,
+      case:          case_,
       priority_list: priorityList || [],
     });
 
@@ -299,10 +408,14 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/cases/:id/priority
 // Save the hospital's priority list and trigger the cascade
 // Called by: Shortlist page — when SPOC clicks Send Requests
+//
+// IMPORTANT: Must be defined BEFORE PATCH /:id so Express doesn't match
+// the ":id/priority" path as just ":id".
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch('/:id/priority', async (req, res) => {
   try {
@@ -310,14 +423,13 @@ router.patch('/:id/priority', async (req, res) => {
     const { priority_list } = req.body;
 
     logger.info('Saving priority list for case', {
-      case_id: id,
-      surgeons: priority_list
+      case_id:  id,
+      surgeons: priority_list,
     });
 
-    // Validate priority list
     if (!priority_list || !Array.isArray(priority_list) || priority_list.length < 1) {
       return res.status(400).json({
-        message: 'Priority list must contain at least 1 surgeon IDs'
+        message: 'Priority list must contain at least 1 surgeon ID'
       });
     }
 
@@ -338,12 +450,11 @@ router.patch('/:id/priority', async (req, res) => {
       return res.status(404).json({ message: 'Case not found' });
     }
 
-    // Insert each surgeon into case_priority_list table
-    // with their priority order number
+    // Insert priority list rows
     const priorityRows = priority_list.map((surgeon_id, index) => ({
       case_id:        id,
-      surgeon_id:     surgeon_id,
-      priority_order: index + 1,  // 1-based (1 = highest priority)
+      surgeon_id,
+      priority_order: index + 1,
       status:         'pending',
     }));
 
@@ -387,21 +498,36 @@ router.patch('/:id/priority', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/cases/:id
-// Update case details — works for all case statuses
-// Called by: CaseDetail page — Edit modal
+// Update any fields on a case.
+// Called by:
+//   - EditCase page (fills in draft case details, moves status to 'active')
+//   - CaseDetail page (edit modal for active/confirmed cases)
+//
+// Handles: all clinical fields + documents (JSONB) + status
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
-  const {
-    procedure, specialty_required, surgery_date, surgery_time,
-    duration_hours, ot_number, fee_min, fee_max,
-    patient_name, patient_age, patient_gender, notes,
-  } = req.body;
-
-  logger.info('Updating case', { case_id: id });
+  logger.info('Updating case', { case_id: id, fields: Object.keys(req.body) });
 
   try {
-    // Build update object — only include fields that were sent
+    const {
+      procedure,
+      specialty_required,
+      surgery_date,
+      surgery_time,
+      duration_hours,
+      ot_number,
+      patient_name,
+      patient_age,
+      patient_gender,
+      fee_min,
+      fee_max,
+      notes,
+      documents,   // JSONB array — uploaded file metadata
+      status,      // allow status transitions (e.g. draft → active)
+    } = req.body;
+
+    // Build update object — only include fields that were actually sent
     const updates = {};
     if (procedure          !== undefined) updates.procedure          = procedure;
     if (specialty_required !== undefined) updates.specialty_required = specialty_required;
@@ -409,12 +535,14 @@ router.patch('/:id', async (req, res) => {
     if (surgery_time       !== undefined) updates.surgery_time       = surgery_time;
     if (duration_hours     !== undefined) updates.duration_hours     = duration_hours;
     if (ot_number          !== undefined) updates.ot_number          = ot_number;
-    if (fee_min            !== undefined) updates.fee_min            = fee_min;
-    if (fee_max            !== undefined) updates.fee_max            = fee_max;
     if (patient_name       !== undefined) updates.patient_name       = patient_name;
     if (patient_age        !== undefined) updates.patient_age        = patient_age;
     if (patient_gender     !== undefined) updates.patient_gender     = patient_gender;
+    if (fee_min            !== undefined) updates.fee_min            = fee_min;
+    if (fee_max            !== undefined) updates.fee_max            = fee_max;
     if (notes              !== undefined) updates.notes              = notes;
+    if (documents          !== undefined) updates.documents          = documents;
+    if (status             !== undefined) updates.status             = status;
     updates.updated_at = new Date().toISOString();
 
     const { data: case_, error } = await supabase
@@ -425,11 +553,16 @@ router.patch('/:id', async (req, res) => {
       .single();
 
     if (error) {
-      logger.error('Failed to update case', { error: error.message });
+      logger.error('Failed to update case', { error: error.message, case_id: id });
       throw error;
     }
 
-    logger.info('Case updated successfully', { case_id: id });
+    logger.info('Case updated successfully', {
+      case_id:   id,
+      status:    case_.status,
+      procedure: case_.procedure,
+    });
+
     return res.json({ message: 'Case updated successfully', case: case_ });
 
   } catch (error) {
@@ -438,6 +571,7 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/cases/:id
 // Delete a case and its priority list entries
@@ -445,7 +579,6 @@ router.patch('/:id', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
-
   logger.info('Deleting case', { case_id: id });
 
   try {
@@ -475,16 +608,177 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/cases/:caseId/surgeon-view
+// Returns case details for the surgeon mobile app.
+// Hospital full address is hidden until surgeon accepts.
+// Called by: RequestDetailScreen
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:caseId/surgeon-view', async (req, res) => {
+  try {
+    const { caseId }    = req.params;
+    const { surgeon_id } = req.query;
+
+    logger.info('Fetching surgeon view for case', { case_id: caseId, surgeon_id });
+
+    const { data: case_, error: caseError } = await supabase
+      .from('cases')
+      .select('*')
+      .eq('id', caseId)
+      .single();
+
+    if (caseError || !case_) {
+      return res.status(404).json({ message: 'Case not found' });
+    }
+
+    // If confirmed → reveal full hospital name. Otherwise city only.
+    const hospitalFields = case_.status === 'confirmed' ? 'id, name, city' : 'city';
+    const { data: hospital } = await supabase
+      .from('hospitals')
+      .select(hospitalFields)
+      .eq('id', case_.hospital_id)
+      .single();
+
+    // Get surgeon's expires_at from their priority list row
+    let expiresAt = null;
+    if (surgeon_id) {
+      const { data: priorityRow } = await supabase
+        .from('case_priority_list')
+        .select('expires_at, status')
+        .eq('case_id', caseId)
+        .eq('surgeon_id', surgeon_id)
+        .single();
+
+      expiresAt = priorityRow?.expires_at || null;
+    }
+
+    logger.info('Surgeon view fetched', { case_id: caseId });
+
+    return res.json({
+      case: {
+        ...case_,
+        hospital_city: hospital?.city || null,
+        hospital_name: hospital?.name || null,  // only populated when confirmed
+        expires_at:    expiresAt,
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error fetching surgeon case view', { error: error.message });
+    return res.status(500).json({ message: 'Failed to fetch case' });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/cases/:caseId/accept
+// Surgeon accepts the case.
+// Updates case_priority_list row to 'accepted', case status to 'confirmed',
+// and sets confirmed_surgeon_id on the case.
+// Called by: RequestDetailScreen
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:caseId/accept', async (req, res) => {
+  try {
+    const { caseId }    = req.params;
+    const { surgeon_id } = req.body;
+
+    logger.info('Surgeon accepting case', { case_id: caseId, surgeon_id });
+
+    if (!surgeon_id) {
+      return res.status(400).json({ message: 'surgeon_id required' });
+    }
+
+    const now = new Date().toISOString();
+
+    // Update priority list row to accepted
+    const { error: priorityError } = await supabase
+      .from('case_priority_list')
+      .update({ status: 'accepted', responded_at: now })
+      .eq('case_id', caseId)
+      .eq('surgeon_id', surgeon_id);
+
+    if (priorityError) {
+      logger.error('Failed to update priority list on accept', { error: priorityError.message });
+      return res.status(500).json({ message: 'Failed to accept case' });
+    }
+
+    // Update case to confirmed
+    const { error: caseError } = await supabase
+      .from('cases')
+      .update({ status: 'confirmed', confirmed_surgeon_id: surgeon_id })
+      .eq('id', caseId);
+
+    if (caseError) {
+      logger.error('Failed to confirm case', { error: caseError.message });
+      return res.status(500).json({ message: 'Failed to confirm case' });
+    }
+
+    logger.info('Case accepted successfully', { case_id: caseId, surgeon_id });
+    return res.json({ message: 'Case accepted successfully' });
+
+  } catch (error) {
+    logger.error('Error accepting case', { error: error.message });
+    return res.status(500).json({ message: 'Failed to accept case' });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/cases/:caseId/decline
+// Surgeon declines the case.
+// Updates case_priority_list row to 'declined', then triggers cascade
+// to notify the next surgeon in the priority list.
+// Called by: RequestDetailScreen
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:caseId/decline', async (req, res) => {
+  try {
+    const { caseId }    = req.params;
+    const { surgeon_id } = req.body;
+
+    logger.info('Surgeon declining case', { case_id: caseId, surgeon_id });
+
+    if (!surgeon_id) {
+      return res.status(400).json({ message: 'surgeon_id required' });
+    }
+
+    const now = new Date().toISOString();
+
+    // Update this surgeon's row to declined
+    const { error: priorityError } = await supabase
+      .from('case_priority_list')
+      .update({ status: 'declined', responded_at: now })
+      .eq('case_id', caseId)
+      .eq('surgeon_id', surgeon_id);
+
+    if (priorityError) {
+      logger.error('Failed to update priority list on decline', { error: priorityError.message });
+      return res.status(500).json({ message: 'Failed to decline case' });
+    }
+
+    // Trigger cascade — notify next surgeon in list
+    await triggerCascade(caseId);
+
+    logger.info('Case declined, cascade triggered', { case_id: caseId });
+    return res.json({ message: 'Case declined' });
+
+  } catch (error) {
+    logger.error('Error declining case', { error: error.message });
+    return res.status(500).json({ message: 'Failed to decline case' });
+  }
+});
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TRIGGER CASCADE
-// Notifies the next surgeon in the priority list
-// Called after priority list is saved, and after each decline/expiry
+// Notifies the next surgeon in the priority list.
+// Called after priority list is saved, and after each decline/expiry.
 // ─────────────────────────────────────────────────────────────────────────────
 async function triggerCascade(caseId) {
   logger.info('Triggering cascade for case', { case_id: caseId });
 
   try {
-    // Find the next pending surgeon in the priority list
+    // Find the next pending surgeon
     const { data: nextRow, error } = await supabase
       .from('case_priority_list')
       .select('*, surgeons(name, phone, email)')
@@ -495,8 +789,7 @@ async function triggerCascade(caseId) {
       .single();
 
     if (error || !nextRow) {
-      logger.warn('No pending surgeons left in cascade', { case_id: caseId });
-      // Update case to unfilled
+      logger.warn('No pending surgeons left — marking case unfilled', { case_id: caseId });
       await supabase
         .from('cases')
         .update({ status: 'unfilled' })
@@ -512,9 +805,9 @@ async function triggerCascade(caseId) {
     const { error: updateError } = await supabase
       .from('case_priority_list')
       .update({
-        status:       'notified',
-        notified_at:  new Date().toISOString(),
-        expires_at:   expiresAt.toISOString(),
+        status:      'notified',
+        notified_at: new Date().toISOString(),
+        expires_at:  expiresAt.toISOString(),
       })
       .eq('id', nextRow.id);
 
@@ -529,9 +822,8 @@ async function triggerCascade(caseId) {
       expires_at:     expiresAt.toISOString(),
     });
 
-    // ── Send WhatsApp/SMS notification to the surgeon ──────────────────────────
-    // First surgeon in cascade gets "new case" message,
-    // subsequent surgeons get "case passed" message
+    // ── Send WhatsApp/SMS notification ─────────────────────────────────────
+    // First surgeon gets "new case" message; subsequent get "case passed"
     const isFirstSurgeon = nextRow.priority_order === 1;
 
     const caseDetails = await supabase
@@ -541,7 +833,7 @@ async function triggerCascade(caseId) {
       .single();
 
     if (caseDetails.data && nextRow.surgeons?.phone) {
-      console.log('=== Firing notification to:', nextRow.surgeons.phone); // ADD THIS
+      console.log('=== Firing notification to:', nextRow.surgeons.phone);
       const notifyFn = isFirstSurgeon ? notifyNewCase : notifyCasePassed;
       await notifyFn({
         surgeonName:  nextRow.surgeons.name,
@@ -559,17 +851,22 @@ async function triggerCascade(caseId) {
   }
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MATCHING ALGORITHM
-// Finds best available surgeons for a given case
-// Returns up to 7 surgeons ordered by best match score
+// Finds the best available surgeons for a given case.
+// Returns up to 7 surgeons ordered by match score.
+//
+// Scoring:
+//   +50  — same city as hospital
+//   +0–50 — surgeon rating (rating × 10)
+//   +0–20 — total cases done (experience on platform)
 // ─────────────────────────────────────────────────────────────────────────────
 async function matchSurgeons({ specialty_required, surgery_date, surgery_time, city, fee_min, fee_max }) {
   try {
     logger.info('Matching: querying verified surgeons', { specialty_required });
 
     // Find all verified, available surgeons with the required specialty
-    // Uses PostgREST 'cs' (contains) operator for array column matching
     const { data: surgeons, error } = await supabase
       .from('surgeons')
       .select('*')
@@ -589,7 +886,7 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
 
     if (!surgeons || surgeons.length === 0) return [];
 
-    // Filter out surgeons with conflicting confirmed cases on the same date
+    // Filter out surgeons with conflicting cases on the same date
     const availableSurgeons = [];
     for (const surgeon of surgeons) {
       try {
@@ -612,7 +909,7 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
         // If conflict check fails, include the surgeon anyway
         logger.warn('Conflict check failed for surgeon, including anyway', {
           surgeon_name: surgeon.name,
-          error: conflictErr.message,
+          error:        conflictErr.message,
         });
         availableSurgeons.push(surgeon);
       }
@@ -622,25 +919,24 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
       count: availableSurgeons.length,
     });
 
-    // Score each surgeon based on matching criteria
+    // Score and sort
     const scoredSurgeons = availableSurgeons.map(surgeon => {
       let score = 0;
 
-      // City match: same city as hospital gets big boost
+      // Same city as hospital = big boost
       if (surgeon.city && city && surgeon.city.toLowerCase() === city.toLowerCase()) {
         score += 50;
       }
 
-      // Rating: higher rating = higher score (max 50 points)
+      // Rating (max 50 points)
       score += (surgeon.rating || 0) * 10;
 
-      // Experience on platform: more cases = slight boost (max 20 points)
+      // Platform experience (max 20 points)
       score += Math.min((surgeon.total_cases || 0) / 10, 20);
 
       return { ...surgeon, match_score: score };
     });
 
-    // Sort by score highest first, return top 7
     scoredSurgeons.sort((a, b) => b.match_score - a.match_score);
     const topSurgeons = scoredSurgeons.slice(0, 7);
 
@@ -656,175 +952,6 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
     return [];
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/cases/:caseId/surgeon-view
-// Returns case details for the surgeon mobile app.
-// Hospital full address is hidden until surgeon accepts.
-// Called by: RequestDetailScreen
-// ─────────────────────────────────────────────────────────────────────────────
-router.get('/:caseId/surgeon-view', async (req, res) => {
-  try {
-    const { caseId } = req.params;
-    const { surgeon_id } = req.query;
-
-    logger.info('Fetching surgeon view for case', { case_id: caseId, surgeon_id });
-
-    // Fetch the case
-    const { data: case_, error: caseError } = await supabase
-      .from('cases')
-      .select('*')
-      .eq('id', caseId)
-      .single();
-
-    if (caseError || !case_) {
-      return res.status(404).json({ message: 'Case not found' });
-    }
-
-   // If case is confirmed, reveal full hospital name + city
-  // If still pending, only show city to protect privacy
-    const hospitalFields = case_.status === 'confirmed' ? 'id, name, city' : 'city';
-    const { data: hospital } = await supabase
-      .from('hospitals')
-      .select(hospitalFields)
-      .eq('id', case_.hospital_id)
-      .single();
-
-    // Fetch this surgeon's priority list row to get expires_at
-    let expiresAt = null;
-    if (surgeon_id) {
-      const { data: priorityRow } = await supabase
-        .from('case_priority_list')
-        .select('expires_at, status')
-        .eq('case_id', caseId)
-        .eq('surgeon_id', surgeon_id)
-        .single();
-
-      expiresAt = priorityRow?.expires_at || null;
-    }
-
-    logger.info('Surgeon view fetched', { case_id: caseId });
-
-    return res.json({
-      case: {
-        ...case_,
-        hospital_city:  hospital?.city || null,
-        hospital_name:  hospital?.name || null,  // only set when confirmed
-        expires_at:     expiresAt,
-      }
-    });
-
-  } catch (error) {
-    logger.error('Error fetching surgeon case view', { error: error.message });
-    return res.status(500).json({ message: 'Failed to fetch case' });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PATCH /api/cases/:caseId/accept
-// Surgeon accepts the case.
-// Updates case_priority_list row to 'accepted', case status to 'confirmed',
-// and sets confirmed_surgeon_id on the case.
-// Called by: RequestDetailScreen
-// ─────────────────────────────────────────────────────────────────────────────
-router.patch('/:caseId/accept', async (req, res) => {
-  try {
-    const { caseId } = req.params;
-    const { surgeon_id } = req.body;
-
-    logger.info('Surgeon accepting case', { case_id: caseId, surgeon_id });
-
-    if (!surgeon_id) {
-      return res.status(400).json({ message: 'surgeon_id required' });
-    }
-
-    const now = new Date().toISOString();
-
-    // Update priority list row to accepted
-    const { error: priorityError } = await supabase
-      .from('case_priority_list')
-      .update({
-        status: 'accepted',
-        responded_at: now,
-      })
-      .eq('case_id', caseId)
-      .eq('surgeon_id', surgeon_id);
-
-    if (priorityError) {
-      logger.error('Failed to update priority list on accept', { error: priorityError.message });
-      return res.status(500).json({ message: 'Failed to accept case' });
-    }
-
-    // Update case to confirmed with this surgeon
-    const { error: caseError } = await supabase
-      .from('cases')
-      .update({
-        status: 'confirmed',
-        confirmed_surgeon_id: surgeon_id,
-      })
-      .eq('id', caseId);
-
-    if (caseError) {
-      logger.error('Failed to confirm case', { error: caseError.message });
-      return res.status(500).json({ message: 'Failed to confirm case' });
-    }
-
-    logger.info('Case accepted successfully', { case_id: caseId, surgeon_id });
-    return res.json({ message: 'Case accepted successfully' });
-
-  } catch (error) {
-    logger.error('Error accepting case', { error: error.message });
-    return res.status(500).json({ message: 'Failed to accept case' });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PATCH /api/cases/:caseId/decline
-// Surgeon declines the case.
-// Updates case_priority_list row to 'declined', then triggers cascade
-// to notify the next surgeon in the priority list.
-// Called by: RequestDetailScreen
-// ─────────────────────────────────────────────────────────────────────────────
-router.patch('/:caseId/decline', async (req, res) => {
-  try {
-    const { caseId } = req.params;
-    const { surgeon_id } = req.body;
-
-    logger.info('Surgeon declining case', { case_id: caseId, surgeon_id });
-
-    if (!surgeon_id) {
-      return res.status(400).json({ message: 'surgeon_id required' });
-    }
-
-    const now = new Date().toISOString();
-
-    // Update this surgeon's row to declined
-    const { error: priorityError } = await supabase
-      .from('case_priority_list')
-      .update({
-        status: 'declined',
-        responded_at: now,
-      })
-      .eq('case_id', caseId)
-      .eq('surgeon_id', surgeon_id);
-
-    if (priorityError) {
-      logger.error('Failed to update priority list on decline', { error: priorityError.message });
-      return res.status(500).json({ message: 'Failed to decline case' });
-    }
-
-    // Trigger cascade — notify next surgeon in the list
-    await triggerCascade(caseId);
-
-    logger.info('Case declined, cascade triggered', { case_id: caseId });
-    return res.json({ message: 'Case declined' });
-
-  } catch (error) {
-    logger.error('Error declining case', { error: error.message });
-    return res.status(500).json({ message: 'Failed to decline case' });
-  }
-});
-
 
 
 module.exports = router;

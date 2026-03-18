@@ -1,0 +1,41 @@
+[2026-03-03 16:44:18] ERROR: Failed to fetch cases | {"error":"invalid input syntax for type uuid: \"PASTE_HOSPITAL_ID\""}
+[2026-03-03 16:44:18] ERROR: Error fetching cases | {"error":"invalid input syntax for type uuid: \"PASTE_HOSPITAL_ID\""}
+[2026-03-03 16:44:18] ERROR: ← GET /?hospital_id=PASTE_HOSPITAL_ID 500 (207ms) | {"response":{"message":"Failed to fetch cases"}}
+[2026-03-03 21:43:35] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:43:35] ERROR: ← POST /login 500 (1845ms) | {"response":{"message":"Failed to create account"}}
+[2026-03-03 21:44:25] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:44:25] ERROR: ← POST /login 500 (469ms) | {"response":{"message":"Failed to create account"}}
+[2026-03-03 21:48:14] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:48:14] ERROR: ← POST /login 500 (1210ms) | {"response":{"message":"Failed to create account"}}
+[2026-03-03 21:49:25] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:49:25] ERROR: ← POST /login 500 (500ms) | {"response":{"message":"null value in column \"mci_number\" of relation \"surgeons\" violates not-null constraint"}}
+[2026-03-03 21:50:48] ERROR: Surgeon login: failed to create surgeon | {"error":"null value in column \"city\" of relation \"surgeons\" violates not-null constraint"}
+[2026-03-03 21:50:48] ERROR: ← POST /login 500 (785ms) | {"response":{"message":"null value in column \"city\" of relation \"surgeons\" violates not-null constraint"}}
+[2026-03-03 21:52:15] ERROR: ← POST /login 401 (368ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-03 22:24:22] ERROR: ← POST /login 401 (304ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-03 22:24:26] ERROR: ← POST /login 401 (234ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-04 10:22:54] ERROR: Surgeon login: failed to create surgeon | {"error":"duplicate key value violates unique constraint \"surgeons_phone_key\""}
+[2026-03-04 10:22:54] ERROR: ← POST /login 500 (437ms) | {"response":{"message":"duplicate key value violates unique constraint \"surgeons_phone_key\""}}
+[2026-03-05 10:40:03] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 10:40:04] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 10:40:04] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 10:44:07] ERROR: ← GET /matches 404 (147ms) | {"response":{"message":"Case not found"}}
+[2026-03-05 10:45:10] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 10:47:04] ERROR: Matching: surgeon query failed | {"error":"malformed array literal: \"[\"Laparoscopic Surgery\"]\""}
+[2026-03-05 10:48:22] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 10:49:36] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 10:51:32] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 10:53:21] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 10:54:46] ERROR: Matching algorithm error | {"error":"cases is not defined"}
+[2026-03-05 11:07:34] ERROR: Surgeon login: failed to create surgeon | {"error":"duplicate key value violates unique constraint \"surgeons_phone_key\""}
+[2026-03-05 11:07:34] ERROR: ← POST /login 500 (428ms) | {"response":{"message":"duplicate key value violates unique constraint \"surgeons_phone_key\""}}
+[2026-03-05 23:03:16] ERROR: ← POST /login 401 (350ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-05 23:03:24] ERROR: ← POST /login 401 (267ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-05 23:03:34] ERROR: ← POST /login 401 (566ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-14 15:42:29] ERROR: ← POST /login 401 (403ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-14 15:42:32] ERROR: ← POST /login 401 (217ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-14 15:42:40] ERROR: ← POST /login 401 (223ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-14 15:42:43] ERROR: ← POST /login 401 (197ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-14 15:42:49] ERROR: ← POST /login 401 (214ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-14 15:42:51] ERROR: ← POST /login 401 (262ms) | {"response":{"message":"Incorrect password"}}
+[2026-03-18 12:58:09] ERROR: ← GET /draft 404 (850ms) | {"response":{"message":"Case not found"}}

@@ -1,3 +1,214 @@
+/* ── SURGEON ON CALL — GLOBAL STYLES ──────────────────────────────────────────
+   index.css
+   Vaidhya Healthcare Pvt Ltd
+
+   Load order:
+   1. Tailwind base / components / utilities
+   2. CSS custom properties (design tokens)
+   3. Base element resets and defaults
+   4. Reusable utility classes (.btn-primary, .input-field, etc.)
+   ──────────────────────────────────────────────────────────────────────────── */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+/* ── DESIGN TOKENS ────────────────────────────────────────────────────────────
+   CSS custom properties mirror the Tailwind config.
+   Use these in any custom CSS that can't use Tailwind classes.
+   ──────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --color-brand:       #E56717;
+  --color-brand-dark:  #CD4D00;
+  --color-brand-light: #FDF8F5;
+
+  /* Text */
+  --color-body:        #444444;
+  --color-muted:       #8B8B8B;
+
+  /* Borders */
+  --color-warm:        #E8E0D8;
+
+  /* Semantic */
+  --color-success:     #16a34a;
+  --color-error:       #dc2626;
+  --color-warning:     #d97706;
+
+  /* Spacing scale (for custom CSS only — prefer Tailwind classes) */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   18px;
+
+  /* Shadow */
+  --shadow-card: 0 1px 4px 0 rgba(68, 44, 20, 0.08);
+}
+
+
+/* ── BASE RESETS ──────────────────────────────────────────────────────────────
+   Applied to raw HTML elements — Tailwind's preflight handles most of it,
+   but we override a few things for our design system.
+   ──────────────────────────────────────────────────────────────────────────── */
+@layer base {
+
+  /* Root font and color */
+  html {
+    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    color: var(--color-body);
+    background-color: var(--color-brand-light);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Body: always fills viewport height */
+  body {
+    min-height: 100vh;
+  }
+
+  /* Headings: slightly tighter tracking */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--color-body);
+    letter-spacing: -0.01em;
+  }
+
+  /* Links: brand color, no underline by default */
+  a {
+    color: var(--color-brand);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--color-brand-dark);
+  }
+
+  /* Focus ring: brand color, not browser default blue */
+  *:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  /* Remove focus ring for mouse users (still visible for keyboard) */
+  *:focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+
+/* ── REUSABLE COMPONENT CLASSES ──────────────────────────────────────────────
+   Defined with @layer components so Tailwind utilities can still override them.
+   Use these in JSX for consistency instead of repeating long class strings.
+   ──────────────────────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── BUTTONS ── */
+
+  /* Primary button — orange fill */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply bg-brand hover:bg-brand-dark active:bg-brand-dark;
+    @apply text-white font-semibold text-sm;
+    @apply px-5 py-2.5 rounded-lg;
+    @apply transition-colors duration-150;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Secondary button — outlined */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply bg-white hover:bg-brand-light;
+    @apply border border-warm;
+    @apply text-body font-medium text-sm;
+    @apply px-5 py-2.5 rounded-lg;
+    @apply transition-colors duration-150;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Ghost / text button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1;
+    @apply text-muted hover:text-brand text-sm font-medium;
+    @apply transition-colors duration-150;
+  }
+
+
+  /* ── FORM INPUTS ── */
+
+  /* Standard text input / select / textarea */
+  .input-field {
+    @apply w-full px-4 py-2.5;
+    @apply border border-warm rounded-lg;
+    @apply text-sm text-body;
+    @apply placeholder:text-muted;
+    @apply bg-white;
+    @apply focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand;
+    @apply transition duration-150;
+  }
+
+  /* Error state override — add this class when field has a validation error */
+  .input-field-error {
+    @apply border-red-400 focus:ring-red-400 focus:border-red-400;
+  }
+
+  /* Form label */
+  .form-label {
+    @apply block text-xs font-semibold text-muted uppercase tracking-wide mb-1;
+  }
+
+  /* Validation error message below a field */
+  .field-error {
+    @apply text-red-500 text-xs mt-1;
+  }
+
+
+  /* ── CARDS ── */
+
+  /* Standard white card */
+  .card {
+    @apply bg-white rounded-xl border border-warm p-6;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Card section heading with numbered badge */
+  .card-section-title {
+    @apply font-semibold text-body mb-4 flex items-center gap-2;
+  }
+
+  /* Numbered section badge */
+  .section-badge {
+    @apply flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center;
+    @apply bg-brand text-white text-xs font-bold;
+  }
+
+
+  /* ── NAV BAR ── */
+
+  /* Top navigation bar */
+  .topnav {
+    @apply px-8 py-4 flex items-center justify-between;
+    background-color: var(--color-body); /* dark charcoal, not cold blue */
+  }
+
+  /* Brand name in nav */
+  .topnav-brand {
+    @apply text-white font-bold text-xl tracking-tight;
+  }
+
+  /* Accent word in brand (e.g. "on Call") */
+  .topnav-brand span {
+    color: var(--color-brand);
+  }
+
+
+  /* ── STATUS BADGES ── */
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-active     { @apply bg-orange-100 text-orange-700; }
+  .badge-confirmed  { @apply bg-green-100 text-green-700; }
+  .badge-pending    { @apply bg-yellow-100 text-yellow-700; }
+  .badge-cancelled  { @apply bg-gray-100 text-gray-500; }
+  .badge-completed  { @apply bg-blue-100 text-blue-700; }
+
+}

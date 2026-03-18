@@ -5,17 +5,22 @@
  * Full admin control panel for the Vaidhya operations team.
  *
  * Tabs:
- * 1. Overview    — platform stats at a glance
- * 2. Cases       — all cases, filters, mark complete/cancel, reassign, cascade
- * 3. Surgeons    — all surgeons, verify/reject, suspend/reactivate
- * 4. Earnings    — commission report
+ * 1. Overview  — platform stats at a glance
+ * 2. Cases     — all cases, filters, mark complete/cancel, reassign, cascade
+ * 3. Surgeons  — all surgeons, verify/reject, suspend/reactivate
+ * 4. Earnings  — commission report
  *
  * Runs on port 3001 (hospital web is on 3000)
  * DEV_MODE = true — no login required during development
+ *
+ * CHANGE LOG:
+ * - Added CasePanel: clicking SOC-XXX case ID opens a slide-out panel
+ *   showing full case details + clinical documents uploaded by the hospital
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import CasePanel from './CasePanel'; // ← slide-out panel with documents
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -23,7 +28,9 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const formatDate = (d) => {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(d).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  });
 };
 
 const formatFee = (paise) => {
@@ -48,14 +55,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
 
   const tabs = [
-    { id: 'overview', label: '📊 Overview' },
-    { id: 'cases',    label: '🏥 Cases' },
-    { id: 'surgeons', label: '👨‍⚕️ Surgeons' },
-    { id: 'earnings', label: '💰 Earnings' },
+    { id: 'overview',  label: '📊 Overview' },
+    { id: 'cases',     label: '🏥 Cases' },
+    { id: 'surgeons',  label: '👨‍⚕️ Surgeons' },
+    { id: 'earnings',  label: '💰 Earnings' },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50">
+
       {/* ── NAV ── */}
       <nav className="bg-blue-900 px-8 py-4 flex items-center justify-between">
         <div>
@@ -89,10 +97,10 @@ export default function App() {
 
       {/* ── TAB CONTENT ── */}
       <div className="max-w-7xl mx-auto px-8 py-8">
-        {activeTab === 'overview' && <OverviewTab />}
-        {activeTab === 'cases'    && <CasesTab />}
-        {activeTab === 'surgeons' && <SurgeonsTab />}
-        {activeTab === 'earnings' && <EarningsTab />}
+        {activeTab === 'overview'  && <OverviewTab />}
+        {activeTab === 'cases'     && <CasesTab />}
+        {activeTab === 'surgeons'  && <SurgeonsTab />}
+        {activeTab === 'earnings'  && <EarningsTab />}
       </div>
     </div>
   );
@@ -100,10 +108,9 @@ export default function App() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OVERVIEW TAB
-// Shows platform-wide stats at a glance
 // ══════════════════════════════════════════════════════════════════════════════
 function OverviewTab() {
-  const [stats, setStats]   = useState(null);
+  const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -114,10 +121,9 @@ function OverviewTab() {
           axios.get(`${API_URL}/api/admin/surgeons`),
           axios.get(`${API_URL}/api/admin/earnings`),
         ]);
-
-        const cases    = casesRes.data.cases    || [];
+        const cases    = casesRes.data.cases || [];
         const surgeons = surgeonsRes.data.surgeons || [];
-        const summary  = earningsRes.data.summary  || {};
+        const summary  = earningsRes.data.summary || {};
 
         setStats({
           total_cases:       cases.length,
@@ -150,16 +156,16 @@ function OverviewTab() {
   );
 
   const statCards = [
-    { label: 'Total Cases',        value: stats.total_cases,       color: 'text-blue-900' },
-    { label: 'Active / Cascading', value: stats.active_cases,      color: 'text-amber-600' },
-    { label: 'Confirmed',          value: stats.confirmed_cases,   color: 'text-green-600' },
-    { label: 'Completed',          value: stats.completed_cases,   color: 'text-teal-600' },
-    { label: 'Unfilled',           value: stats.unfilled_cases,    color: 'text-red-500' },
-    { label: 'Fill Rate',          value: `${stats.fill_rate}%`,   color: 'text-blue-700' },
-    { label: 'Total Surgeons',     value: stats.total_surgeons,    color: 'text-blue-900' },
-    { label: 'Verified Surgeons',  value: stats.verified_surgeons, color: 'text-green-600' },
-    { label: 'Pending Verification', value: stats.pending_surgeons, color: 'text-amber-600' },
-    { label: 'Platform Commission', value: formatFee(stats.total_commission), color: 'text-teal-600' },
+    { label: 'Total Cases',           value: stats.total_cases,       color: 'text-blue-900' },
+    { label: 'Active / Cascading',    value: stats.active_cases,      color: 'text-amber-600' },
+    { label: 'Confirmed',             value: stats.confirmed_cases,   color: 'text-green-600' },
+    { label: 'Completed',             value: stats.completed_cases,   color: 'text-teal-600' },
+    { label: 'Unfilled',              value: stats.unfilled_cases,    color: 'text-red-500' },
+    { label: 'Fill Rate',             value: `${stats.fill_rate}%`,   color: 'text-blue-700' },
+    { label: 'Total Surgeons',        value: stats.total_surgeons,    color: 'text-blue-900' },
+    { label: 'Verified Surgeons',     value: stats.verified_surgeons, color: 'text-green-600' },
+    { label: 'Pending Verification',  value: stats.pending_surgeons,  color: 'text-amber-600' },
+    { label: 'Platform Commission',   value: formatFee(stats.total_commission), color: 'text-teal-600' },
   ];
 
   return (
@@ -179,24 +185,33 @@ function OverviewTab() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CASES TAB
-// All cases with filters, status updates, reassign, cascade override
+// All cases with filters, status updates, reassign, cascade override.
+//
+// CHANGE: SOC-XXX case IDs are now clickable buttons.
+// Clicking one sets `selectedCase` state which opens the CasePanel slide-out.
+// CasePanel shows full case details + clinical documents.
 // ══════════════════════════════════════════════════════════════════════════════
 function CasesTab() {
-  const [cases, setCases]         = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [filter, setFilter]       = useState('all');
-  const [actionMsg, setActionMsg] = useState('');
+  const [cases,          setCases]          = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [filter,         setFilter]         = useState('all');
+  const [actionMsg,      setActionMsg]      = useState('');
+
+  // ── NEW: selected case for the slide-out panel ──
+  const [selectedCase,   setSelectedCase]   = useState(null);
 
   // Reassign modal state
-  const [reassignCase, setReassignCase]     = useState(null);
-  const [allSurgeons, setAllSurgeons]       = useState([]);
+  const [reassignCase,   setReassignCase]   = useState(null);
+  const [allSurgeons,    setAllSurgeons]    = useState([]);
   const [selectedSurgeon, setSelectedSurgeon] = useState('');
-  const [reassigning, setReassigning]       = useState(false);
+  const [reassigning,    setReassigning]    = useState(false);
 
   const fetchCases = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/api/admin/cases`, { params: { status: filter } });
+      const res = await axios.get(`${API_URL}/api/admin/cases`, {
+        params: { status: filter }
+      });
       setCases(res.data.cases || []);
     } catch (err) {
       console.error('Failed to fetch cases:', err);
@@ -240,7 +255,9 @@ function CasesTab() {
     setReassignCase(case_);
     setSelectedSurgeon('');
     try {
-      const res = await axios.get(`${API_URL}/api/admin/surgeons`, { params: { filter: 'verified' } });
+      const res = await axios.get(`${API_URL}/api/admin/surgeons`, {
+        params: { filter: 'verified' }
+      });
       setAllSurgeons(res.data.surgeons || []);
     } catch (err) {
       console.error('Failed to load surgeons:', err);
@@ -315,9 +332,19 @@ function CasesTab() {
                   const st = CASE_STATUS[c.status] || CASE_STATUS.active;
                   return (
                     <tr key={c.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-mono text-blue-700">
-                        SOC-{String(c.case_number).padStart(3, '0')}
+
+                      {/* ── SOC-XXX: now a clickable button that opens CasePanel ── */}
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setSelectedCase(c)}
+                          className="text-sm font-mono font-semibold text-blue-700 hover:text-blue-900
+                            hover:underline transition-colors text-left"
+                          title="Click to view case details and documents"
+                        >
+                          SOC-{String(c.case_number).padStart(3, '0')}
+                        </button>
                       </td>
+
                       <td className="px-4 py-3 text-sm text-gray-800">{c.procedure}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {c.hospitals?.name}<br />
@@ -335,19 +362,15 @@ function CasesTab() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1 flex-wrap">
-                          {/* Reassign surgeon */}
                           {['confirmed', 'cascading', 'active'].includes(c.status) && (
                             <ActionBtn color="blue" onClick={() => openReassign(c)}>Reassign</ActionBtn>
                           )}
-                          {/* Trigger cascade */}
                           {['active', 'cascading'].includes(c.status) && (
                             <ActionBtn color="amber" onClick={() => triggerCascade(c.id)}>Cascade</ActionBtn>
                           )}
-                          {/* Mark complete */}
                           {c.status === 'confirmed' && (
                             <ActionBtn color="teal" onClick={() => updateStatus(c.id, 'completed')}>Complete</ActionBtn>
                           )}
-                          {/* Cancel */}
                           {!['completed', 'cancelled'].includes(c.status) && (
                             <ActionBtn color="red" onClick={() => {
                               if (window.confirm('Cancel this case?')) updateStatus(c.id, 'cancelled');
@@ -364,9 +387,22 @@ function CasesTab() {
         </div>
       )}
 
+      {/* ── CASE DETAIL PANEL ──────────────────────────────────────────────────
+          Slides in from the right when a SOC-XXX case ID is clicked.
+          Shows full case details + clinical documents uploaded by hospital.
+          Close by clicking the ✕ button or clicking the dark backdrop.
+      ────────────────────────────────────────────────────────────────────── */}
+      <CasePanel
+        case={selectedCase}
+        onClose={() => setSelectedCase(null)}
+      />
+
       {/* ── REASSIGN MODAL ── */}
       {reassignCase && (
-        <Modal title={`Reassign Surgeon — SOC-${String(reassignCase.case_number).padStart(3,'0')}`} onClose={() => setReassignCase(null)}>
+        <Modal
+          title={`Reassign Surgeon — SOC-${String(reassignCase.case_number).padStart(3,'0')}`}
+          onClose={() => setReassignCase(null)}
+        >
           <p className="text-sm text-gray-600 mb-4">
             Select a verified surgeon to manually assign to this case.
             The current surgeon (if any) will be marked as overridden.
@@ -404,20 +440,18 @@ function CasesTab() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SURGEONS TAB
-// All surgeons with verify/reject/suspend/reactivate actions
 // ══════════════════════════════════════════════════════════════════════════════
 function SurgeonsTab() {
-  const [surgeons, setSurgeons]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [filter, setFilter]       = useState('all');
+  const [surgeons, setSurgeons] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [filter,   setFilter]   = useState('all');
   const [actionMsg, setActionMsg] = useState('');
 
   const fetchSurgeons = useCallback(async () => {
     setLoading(true);
     try {
-      const filterParam = filter === 'verified' ? { available: 'true' } 
-                  : filter === 'pending'   ? { available: 'false' }
-                  : {};
+      const filterParam = filter === 'verified' ? { available: 'true' }
+        : filter === 'pending' ? { available: 'false' } : {};
       const res = await axios.get(`${API_URL}/api/admin/surgeons`, { params: filterParam });
       setSurgeons(res.data.surgeons || []);
     } catch (err) {
@@ -436,9 +470,7 @@ function SurgeonsTab() {
       await axios.patch(`${API_URL}/api/admin/surgeons/${id}/verify`, { action });
       showMsg(`Surgeon ${action}ed successfully`);
       fetchSurgeons();
-    } catch (err) {
-      showMsg('Action failed');
-    }
+    } catch (err) { showMsg('Action failed'); }
   };
 
   const suspendAction = async (id, action) => {
@@ -446,9 +478,7 @@ function SurgeonsTab() {
       await axios.patch(`${API_URL}/api/admin/surgeons/${id}/suspend`, { action });
       showMsg(`Surgeon ${action}ed successfully`);
       fetchSurgeons();
-    } catch (err) {
-      showMsg('Action failed');
-    }
+    } catch (err) { showMsg('Action failed'); }
   };
 
   const filters = ['all', 'pending', 'verified', 'suspended'];
@@ -464,7 +494,6 @@ function SurgeonsTab() {
         )}
       </div>
 
-      {/* Filter tabs */}
       <div className="flex gap-2 mb-5">
         {filters.map(f => (
           <button
@@ -476,7 +505,10 @@ function SurgeonsTab() {
                 : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-400'
             }`}
           >
-            {f === 'pending' ? '⏳ Pending Verification' : f === 'verified' ? '✅ Verified' : f === 'suspended' ? '🚫 Suspended' : 'All'}
+            {f === 'pending' ? '⏳ Pending Verification'
+              : f === 'verified'  ? '✅ Verified'
+              : f === 'suspended' ? '🚫 Suspended'
+              : 'All'}
           </button>
         ))}
       </div>
@@ -520,7 +552,6 @@ function SurgeonsTab() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
-                        {/* Verify/Reject — for unverified surgeons */}
                         {!s.verified && s.status !== 'suspended' && (
                           <>
                             <ActionBtn color="green" onClick={() => verifyAction(s.id, 'verify')}>Verify</ActionBtn>
@@ -529,20 +560,17 @@ function SurgeonsTab() {
                             }}>Reject</ActionBtn>
                           </>
                         )}
-                        {/* Suspend — for verified active surgeons */}
                         {s.verified && s.status === 'active' && (
                           <ActionBtn color="red" onClick={() => {
                             if (window.confirm(`Suspend ${s.name}?`)) suspendAction(s.id, 'suspend');
                           }}>Suspend</ActionBtn>
                         )}
-                        {/* Reactivate — for suspended surgeons */}
                         {s.status === 'suspended' && (
                           <ActionBtn color="green" onClick={() => suspendAction(s.id, 'reactivate')}>Reactivate</ActionBtn>
                         )}
-                        {/* View documents */}
                         {s.certificate_url && (
-  
-                           <a href={s.certificate_url}
+                          <a
+                            href={s.certificate_url}
                             target="_blank"
                             rel="noreferrer"
                             className="px-2 py-1 rounded text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
@@ -565,12 +593,11 @@ function SurgeonsTab() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // EARNINGS TAB
-// Commission report across all cases
 // ══════════════════════════════════════════════════════════════════════════════
 function EarningsTab() {
   const [earnings, setEarnings] = useState([]);
-  const [summary, setSummary]   = useState(null);
-  const [loading, setLoading]   = useState(true);
+  const [summary,  setSummary]  = useState(null);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     const fetchEarnings = async () => {
@@ -593,17 +620,15 @@ function EarningsTab() {
     <div>
       <h2 className="text-xl font-bold text-blue-900 mb-6">Earnings & Commission</h2>
 
-      {/* Summary cards */}
       {summary && (
         <div className="grid grid-cols-4 gap-4 mb-8">
-          <SummaryCard label="Total Cases" value={summary.total_cases} color="text-blue-900" />
-          <SummaryCard label="Total Commission" value={formatFee(summary.total_commission)} color="text-teal-600" />
-          <SummaryCard label="From Hospitals (5%)" value={formatFee(summary.hospital_commission)} color="text-blue-700" />
-          <SummaryCard label="From Surgeons (5%)" value={formatFee(summary.surgeon_commission)} color="text-green-600" />
+          <SummaryCard label="Total Cases"          value={summary.total_cases}          color="text-blue-900" />
+          <SummaryCard label="Total Commission"     value={formatFee(summary.total_commission)}   color="text-teal-600" />
+          <SummaryCard label="From Hospitals (5%)"  value={formatFee(summary.hospital_commission)} color="text-blue-700" />
+          <SummaryCard label="From Surgeons (5%)"   value={formatFee(summary.surgeon_commission)}  color="text-green-600" />
         </div>
       )}
 
-      {/* Earnings table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {earnings.length === 0 ? (
           <div className="p-12 text-center text-gray-400">No completed cases yet</div>
@@ -611,7 +636,8 @@ function EarningsTab() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Case', 'Procedure', 'Hospital', 'Surgeon', 'Date', 'Surgeon Fee', 'Hospital Comm (5%)', 'Surgeon Comm (5%)', 'Total Comm', 'Status'].map(h => (
+                {['Case', 'Procedure', 'Hospital', 'Surgeon', 'Date', 'Surgeon Fee',
+                  'Hospital Comm (5%)', 'Surgeon Comm (5%)', 'Total Comm', 'Status'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -648,14 +674,13 @@ function EarningsTab() {
 // SHARED UI COMPONENTS
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Small action button used in tables
 function ActionBtn({ children, onClick, color = 'blue' }) {
   const colors = {
-    blue:  'bg-blue-50 text-blue-700 hover:bg-blue-100',
+    blue:  'bg-blue-50  text-blue-700  hover:bg-blue-100',
     green: 'bg-green-50 text-green-700 hover:bg-green-100',
     amber: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
-    teal:  'bg-teal-50 text-teal-700 hover:bg-teal-100',
-    red:   'bg-red-50 text-red-600 hover:bg-red-100',
+    teal:  'bg-teal-50  text-teal-700  hover:bg-teal-100',
+    red:   'bg-red-50   text-red-600   hover:bg-red-100',
   };
   return (
     <button onClick={onClick} className={`px-2 py-1 rounded text-xs font-semibold transition ${colors[color]}`}>
@@ -664,7 +689,6 @@ function ActionBtn({ children, onClick, color = 'blue' }) {
   );
 }
 
-// Modal wrapper
 function Modal({ title, onClose, children }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -679,7 +703,6 @@ function Modal({ title, onClose, children }) {
   );
 }
 
-// Summary stat card
 function SummaryCard({ label, value, color }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -689,7 +712,6 @@ function SummaryCard({ label, value, color }) {
   );
 }
 
-// Loading spinner
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-16">
