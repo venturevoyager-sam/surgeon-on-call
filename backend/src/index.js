@@ -65,6 +65,10 @@ const ALLOWED_ORIGINS = [
   'https://hospital.surgeononcall.in',
   'https://doctor.surgeononcall.in',
   'https://admin.surgeononcall.in',
+  // Render deployments
+  'https://surgeon-on-call-hospital.onrender.com',
+  'https://surgeon-on-call-doctor.onrender.com',
+  'https://surgeon-on-call-admin.onrender.com',
 ];
 
 app.use(cors({
