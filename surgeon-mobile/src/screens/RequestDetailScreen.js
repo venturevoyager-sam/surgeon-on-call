@@ -24,6 +24,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -62,6 +63,23 @@ export default function RequestDetailScreen({ navigation, route }) {
   const [error,      setError]      = useState('');
   const [timeLeft,   setTimeLeft]   = useState('');
 
+  // ── SURGERY RECOMMENDATION STATE (Migration 004) ──────────────────────────
+  // These power the "Recommend Surgery" section for confirmed re-consult cases.
+  // - existingRec: fetched on load — if non-null, the surgeon already submitted
+  // - showRecForm: toggles the form open/closed
+  // - recForm: controlled form fields
+  // - recSubmitting / recError: form submission state
+  const [existingRec,   setExistingRec]   = useState(null);
+  const [recLoading,    setRecLoading]    = useState(false);
+  const [showRecForm,   setShowRecForm]   = useState(false);
+  const [recSubmitting, setRecSubmitting] = useState(false);
+  const [recError,      setRecError]      = useState('');
+  const [recForm, setRecForm] = useState({
+    suggested_procedure:    '',
+    recommendation_notes:   '',
+    urgency:                'elective',
+  });
+
   // ── FETCH CASE DETAILS ─────────────────────────────────────────────────────
   useEffect(() => {
     const fetchCase = async () => {
@@ -79,6 +97,35 @@ export default function RequestDetailScreen({ navigation, route }) {
     };
     fetchCase();
   }, [caseId]);
+
+  // ── FETCH EXISTING RECOMMENDATION (Migration 004) ─────────────────────────
+  // For confirmed re-consult cases, check if the surgeon already submitted a
+  // surgery recommendation. If yes, we show the submitted summary instead of
+  // the form. This prevents duplicate submissions.
+  useEffect(() => {
+    if (!caseData) return;
+    if (caseData.request_type !== 'reconsult') return;
+    if (caseData.status !== 'confirmed') return;
+
+    const fetchRecommendation = async () => {
+      setRecLoading(true);
+      try {
+        const res = await axios.get(
+          `${CONFIG.API_URL}/api/cases/${caseId}/recommendation`
+        );
+        if (res.data.recommendation) {
+          setExistingRec(res.data.recommendation);
+        }
+      } catch (err) {
+        // Non-fatal — if the fetch fails, we just show the form
+        console.log('Could not fetch existing recommendation:', err.message);
+      } finally {
+        setRecLoading(false);
+      }
+    };
+
+    fetchRecommendation();
+  }, [caseData?.request_type, caseData?.status, caseId]);
 
   // ── COUNTDOWN TIMER ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -133,6 +180,49 @@ export default function RequestDetailScreen({ navigation, route }) {
     );
   };
 
+  // ── SUBMIT SURGERY RECOMMENDATION (Migration 004) ─────────────────────────
+  // Posts the surgeon's recommendation to the backend. On success, stores the
+  // returned recommendation in existingRec so the form is replaced with the
+  // confirmation summary.
+  const handleSubmitRecommendation = async () => {
+    // Validate required field
+    if (!recForm.suggested_procedure.trim()) {
+      setRecError('Please enter the suggested procedure name');
+      return;
+    }
+
+    setRecSubmitting(true);
+    setRecError('');
+
+    try {
+      const res = await axios.post(
+        `${CONFIG.API_URL}/api/cases/${caseId}/recommend`,
+        {
+          surgeon_id:           surgeonId,
+          suggested_procedure:  recForm.suggested_procedure.trim(),
+          recommendation_notes: recForm.recommendation_notes.trim() || null,
+          urgency:              recForm.urgency,
+        }
+      );
+
+      // Store the returned recommendation — this switches the UI from
+      // form → confirmation summary
+      setExistingRec(res.data.recommendation);
+      setShowRecForm(false);
+
+      Alert.alert(
+        'Recommendation Submitted',
+        'The hospital has been notified of your surgery recommendation.'
+      );
+
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Could not submit recommendation. Please try again.';
+      setRecError(msg);
+    } finally {
+      setRecSubmitting(false);
+    }
+  };
+
   // ── OPEN DOCUMENT ──────────────────────────────────────────────────────────
   const openDocument = async (url) => {
     try {
@@ -185,6 +275,9 @@ export default function RequestDetailScreen({ navigation, route }) {
   }
 
   const hasDocuments = Array.isArray(caseData.documents) && caseData.documents.length > 0;
+
+  // True when this is a confirmed re-consult — the surgeon can recommend surgery
+  const isConfirmedReconsult = caseData.request_type === 'reconsult' && caseData.status === 'confirmed';
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
@@ -262,23 +355,176 @@ export default function RequestDetailScreen({ navigation, route }) {
 
           <View style={styles.feeRow}>
             <Text style={styles.feeLabelText}>Offered Fee</Text>
-            <Text style={styles.feeValueText}>{formatFee(caseData.fee_max)}</Text>
+            <Text style={styles.feeValueText}>{formatFee((caseData.fee || caseData.fee_max))}</Text>
           </View>
           <View style={styles.feeDivider} />
 
           <View style={styles.feeRow}>
             <Text style={styles.feeLabelText}>Platform Commission (5%)</Text>
             <Text style={styles.feeCommission}>
-              − ₹{((caseData.fee_max / 100) * 0.05).toLocaleString('en-IN')}
+              − ₹{(((caseData.fee || caseData.fee_max) / 100) * 0.05).toLocaleString('en-IN')}
             </Text>
           </View>
           <View style={styles.feeDivider} />
 
           <View style={styles.feeRow}>
             <Text style={styles.feeNetLabel}>Your Net Payout</Text>
-            <Text style={styles.feeNetValue}>{netPayout(caseData.fee_max)}</Text>
+            <Text style={styles.feeNetValue}>{netPayout((caseData.fee || caseData.fee_max))}</Text>
           </View>
         </View>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            SURGERY RECOMMENDATION SECTION (Migration 004)
+            Only shown for confirmed re-consult cases. Three states:
+            1. Loading — spinner while we check for existing recommendation
+            2. Existing recommendation — read-only summary of what was submitted
+            3. No recommendation yet — "Recommend Surgery" button → expandable form
+        ════════════════════════════════════════════════════════════════════ */}
+        {isConfirmedReconsult && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Surgery Recommendation</Text>
+
+            {/* State 1: Loading existing recommendation */}
+            {recLoading && (
+              <View style={styles.recLoadingWrap}>
+                <ActivityIndicator size="small" color={BRAND.orange} />
+                <Text style={styles.recLoadingText}>Checking for existing recommendation...</Text>
+              </View>
+            )}
+
+            {/* State 2: Existing recommendation — read-only summary */}
+            {!recLoading && existingRec && (
+              <View style={styles.recSummary}>
+                <View style={styles.recSummaryBadge}>
+                  <Text style={styles.recSummaryBadgeText}>Submitted</Text>
+                </View>
+
+                <Row label="Procedure"  value={existingRec.suggested_procedure} />
+                <Row label="Urgency"    value={existingRec.urgency === 'urgent' ? 'Urgent' : 'Elective'} />
+                {existingRec.recommendation_notes && (
+                  <Row label="Notes" value={existingRec.recommendation_notes} last />
+                )}
+                {!existingRec.recommendation_notes && (
+                  <View style={styles.recNoNotes}>
+                    <Text style={styles.recNoNotesText}>No additional notes</Text>
+                  </View>
+                )}
+
+                <Text style={styles.recSummaryHint}>
+                  The hospital has been notified and will review your recommendation.
+                </Text>
+              </View>
+            )}
+
+            {/* State 3: No recommendation yet — button or form */}
+            {!recLoading && !existingRec && !showRecForm && (
+              <TouchableOpacity
+                style={styles.recOpenBtn}
+                onPress={() => setShowRecForm(true)}
+              >
+                <Text style={styles.recOpenBtnText}>Recommend Surgery</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Expandable recommendation form */}
+            {!recLoading && !existingRec && showRecForm && (
+              <View style={styles.recForm}>
+
+                {/* Error message */}
+                {recError ? (
+                  <View style={styles.recErrorWrap}>
+                    <Text style={styles.recErrorText}>{recError}</Text>
+                  </View>
+                ) : null}
+
+                {/* Suggested Procedure (required) */}
+                <Text style={styles.recFieldLabel}>Suggested Procedure *</Text>
+                <TextInput
+                  style={styles.recInput}
+                  value={recForm.suggested_procedure}
+                  onChangeText={(t) => {
+                    setRecForm(prev => ({ ...prev, suggested_procedure: t }));
+                    if (recError) setRecError('');
+                  }}
+                  placeholder="e.g. Laparoscopic Cholecystectomy"
+                  placeholderTextColor={BRAND.muted}
+                />
+
+                {/* Recommendation Notes (optional, multiline) */}
+                <Text style={styles.recFieldLabel}>Clinical Notes (optional)</Text>
+                <TextInput
+                  style={[styles.recInput, styles.recTextArea]}
+                  value={recForm.recommendation_notes}
+                  onChangeText={(t) => setRecForm(prev => ({ ...prev, recommendation_notes: t }))}
+                  placeholder="Findings, rationale, patient condition..."
+                  placeholderTextColor={BRAND.muted}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+
+                {/* Urgency selector — two toggle buttons */}
+                <Text style={styles.recFieldLabel}>Urgency *</Text>
+                <View style={styles.urgencyRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.urgencyBtn,
+                      recForm.urgency === 'elective' && styles.urgencyBtnActive,
+                    ]}
+                    onPress={() => setRecForm(prev => ({ ...prev, urgency: 'elective' }))}
+                  >
+                    <Text style={[
+                      styles.urgencyBtnText,
+                      recForm.urgency === 'elective' && styles.urgencyBtnTextActive,
+                    ]}>
+                      Elective
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.urgencyBtn,
+                      recForm.urgency === 'urgent' && styles.urgencyBtnUrgentActive,
+                    ]}
+                    onPress={() => setRecForm(prev => ({ ...prev, urgency: 'urgent' }))}
+                  >
+                    <Text style={[
+                      styles.urgencyBtnText,
+                      recForm.urgency === 'urgent' && styles.urgencyBtnUrgentTextActive,
+                    ]}>
+                      Urgent
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Submit / Cancel buttons */}
+                <View style={styles.recFormActions}>
+                  <TouchableOpacity
+                    style={styles.recCancelBtn}
+                    onPress={() => {
+                      setShowRecForm(false);
+                      setRecError('');
+                    }}
+                    disabled={recSubmitting}
+                  >
+                    <Text style={styles.recCancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.recSubmitBtn, recSubmitting && { opacity: 0.6 }]}
+                    onPress={handleSubmitRecommendation}
+                    disabled={recSubmitting}
+                  >
+                    {recSubmitting
+                      ? <ActivityIndicator color="#FFFFFF" size="small" />
+                      : <Text style={styles.recSubmitBtnText}>Submit Recommendation</Text>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -523,4 +769,178 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND.orange,
   },
   acceptBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+
+  // ── SURGERY RECOMMENDATION STYLES (Migration 004) ─────────────────────────
+
+  // Loading state while fetching existing recommendation
+  recLoadingWrap: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           10,
+    paddingVertical: 8,
+  },
+  recLoadingText: {
+    fontSize: 13,
+    color:    BRAND.muted,
+  },
+
+  // Submitted recommendation summary — green-tinted card
+  recSummary: {
+    backgroundColor: BRAND.greenBg,
+    borderRadius:    10,
+    padding:         14,
+    borderWidth:     1,
+    borderColor:     BRAND.greenBorder,
+  },
+  recSummaryBadge: {
+    alignSelf:       'flex-start',
+    backgroundColor: BRAND.green,
+    borderRadius:    6,
+    paddingHorizontal: 10,
+    paddingVertical:   4,
+    marginBottom:    12,
+  },
+  recSummaryBadgeText: {
+    color:      '#FFFFFF',
+    fontSize:   11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  recSummaryHint: {
+    fontSize:    12,
+    color:       BRAND.green,
+    marginTop:   12,
+    fontStyle:   'italic',
+  },
+  recNoNotes: {
+    paddingVertical: 6,
+  },
+  recNoNotesText: {
+    fontSize: 13,
+    color:    BRAND.muted,
+    fontStyle: 'italic',
+  },
+
+  // "Recommend Surgery" button — brand orange, outlined
+  recOpenBtn: {
+    borderWidth:       2,
+    borderColor:       BRAND.orange,
+    borderRadius:      10,
+    paddingVertical:   14,
+    alignItems:        'center',
+  },
+  recOpenBtnText: {
+    color:      BRAND.orange,
+    fontSize:   15,
+    fontWeight: '700',
+  },
+
+  // Recommendation form
+  recForm: {
+    gap: 4,
+  },
+  recFieldLabel: {
+    fontSize:    13,
+    fontWeight:  '600',
+    color:       BRAND.body,
+    marginTop:   10,
+    marginBottom: 6,
+  },
+  recInput: {
+    backgroundColor: BRAND.bg,
+    borderWidth:     1,
+    borderColor:     BRAND.border,
+    borderRadius:    10,
+    paddingHorizontal: 14,
+    paddingVertical:   12,
+    fontSize:        14,
+    color:           BRAND.body,
+  },
+  recTextArea: {
+    minHeight:       80,
+    textAlignVertical: 'top',
+  },
+
+  // Urgency toggle buttons
+  urgencyRow: {
+    flexDirection: 'row',
+    gap:           10,
+    marginTop:     2,
+  },
+  urgencyBtn: {
+    flex:            1,
+    paddingVertical: 12,
+    borderRadius:    10,
+    alignItems:      'center',
+    borderWidth:     2,
+    borderColor:     BRAND.border,
+    backgroundColor: '#FFFFFF',
+  },
+  urgencyBtnText: {
+    fontSize:   14,
+    fontWeight: '600',
+    color:      BRAND.muted,
+  },
+  // Elective selected — brand orange
+  urgencyBtnActive: {
+    borderColor:     BRAND.orange,
+    backgroundColor: '#FFF7F0',
+  },
+  urgencyBtnTextActive: {
+    color: BRAND.orange,
+  },
+  // Urgent selected — red
+  urgencyBtnUrgentActive: {
+    borderColor:     BRAND.red,
+    backgroundColor: BRAND.redBg,
+  },
+  urgencyBtnUrgentTextActive: {
+    color: BRAND.red,
+  },
+
+  // Form action buttons
+  recFormActions: {
+    flexDirection: 'row',
+    gap:           10,
+    marginTop:     16,
+  },
+  recCancelBtn: {
+    flex:            1,
+    paddingVertical: 14,
+    borderRadius:    10,
+    alignItems:      'center',
+    borderWidth:     1,
+    borderColor:     BRAND.border,
+  },
+  recCancelBtnText: {
+    color:      BRAND.muted,
+    fontSize:   14,
+    fontWeight: '600',
+  },
+  recSubmitBtn: {
+    flex:            2,
+    paddingVertical: 14,
+    borderRadius:    10,
+    alignItems:      'center',
+    justifyContent:  'center',
+    backgroundColor: BRAND.orange,
+  },
+  recSubmitBtnText: {
+    color:      '#FFFFFF',
+    fontSize:   14,
+    fontWeight: '700',
+  },
+
+  // Error message inside the form
+  recErrorWrap: {
+    backgroundColor: BRAND.redBg,
+    borderRadius:    8,
+    padding:         10,
+    marginBottom:    4,
+  },
+  recErrorText: {
+    color:    BRAND.red,
+    fontSize: 13,
+  },
 });

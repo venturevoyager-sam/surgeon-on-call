@@ -5,6 +5,10 @@
  * A slide-out panel that opens from the right when admin clicks a case ID.
  * Shows full case details including clinical documents uploaded by the hospital.
  *
+ * UPDATED (Migration 001): Shows single fee field instead of fee_min/fee_max.
+ * UPDATED (Migration 004): Shows request_type badge, parent_case_id link,
+ *   and surgery recommendation if one exists.
+ *
  * Usage in admin App.js Cases tab:
  *   import CasePanel from './CasePanel';
  *   <CasePanel case={selectedCase} onClose={() => setSelectedCase(null)} />
@@ -14,7 +18,10 @@
  *   onClose — callback to clear the selected case and close the panel
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 // ── FILE ICON ──────────────────────────────────────────────────────────────────
 // Returns an emoji based on MIME type
@@ -38,11 +45,54 @@ function formatFee(paise) {
   return '₹' + (paise / 100).toLocaleString('en-IN');
 }
 
+// ── REQUEST TYPE BADGE CONFIG (Migration 001) ─────────────────────────────────
+// Color-coded badges for each request type
+const REQUEST_TYPE_STYLES = {
+  emergency:  { bg: '#FEF2F2', color: '#DC2626', label: 'Emergency' },
+  opd:        { bg: '#EFF6FF', color: '#1D4ED8', label: 'OPD' },
+  reconsult:  { bg: '#F5F3FF', color: '#7C3AED', label: 'Re-consult' },
+  elective:   { bg: '#F3F4F6', color: '#6B7280', label: 'Elective' },
+};
+
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 export default function CasePanel({ case: c, onClose }) {
 
   // Don't render if no case is selected
   if (!c) return null;
+
+  return <CasePanelInner c={c} onClose={onClose} />;
+}
+
+/**
+ * Inner component — separated so we can use hooks (useEffect) inside it.
+ * The outer component returns null early when no case is selected, which
+ * would violate the rules of hooks if we put useEffect there.
+ */
+function CasePanelInner({ c, onClose }) {
+
+  // ── SURGERY RECOMMENDATION STATE (Migration 004) ────────────────────────────
+  // Fetched on mount for re-consult cases. Shows the surgeon's recommendation
+  // (suggested procedure, urgency, notes) if one exists.
+  const [recommendation, setRecommendation] = useState(null);
+  const [recLoading, setRecLoading]         = useState(false);
+
+  useEffect(() => {
+    // Only fetch recommendation for re-consult cases
+    if (c.request_type !== 'reconsult') return;
+
+    const fetchRec = async () => {
+      setRecLoading(true);
+      try {
+        const res = await axios.get(`${API_URL}/api/cases/${c.id}/recommendation`);
+        setRecommendation(res.data.recommendation || null);
+      } catch (err) {
+        console.error('Failed to fetch recommendation:', err);
+      } finally {
+        setRecLoading(false);
+      }
+    };
+    fetchRec();
+  }, [c.id, c.request_type]);
 
   // Parse documents — stored as JSONB array, each: { name, url, type }
   const documents = Array.isArray(c.documents) ? c.documents : [];
@@ -56,6 +106,7 @@ export default function CasePanel({ case: c, onClose }) {
     completed:   { bg: '#F0FDFA', color: '#0F766E' },
     cancelled:   { bg: '#FEF2F2', color: '#DC2626' },
     unfilled:    { bg: '#FEF2F2', color: '#DC2626' },
+    converted:   { bg: '#F5F3FF', color: '#7C3AED' },
   };
   const statusLabels = {
     active:      'Active',
@@ -65,8 +116,12 @@ export default function CasePanel({ case: c, onClose }) {
     completed:   'Completed',
     cancelled:   'Cancelled',
     unfilled:    'Unfilled',
+    converted:   'Converted',
   };
   const st = statusStyles[c.status] || { bg: '#F3F4F6', color: '#6B7280' };
+
+  // Request type badge styling (Migration 001)
+  const rt = REQUEST_TYPE_STYLES[c.request_type] || REQUEST_TYPE_STYLES.elective;
 
   return (
     <>
@@ -114,7 +169,18 @@ export default function CasePanel({ case: c, onClose }) {
               SOC-{String(c.case_number).padStart(3, '0')}
             </h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Request type badge (Migration 001) */}
+            <span style={{
+              padding: '4px 10px',
+              borderRadius: '999px',
+              fontSize: '11px',
+              fontWeight: '600',
+              backgroundColor: rt.bg,
+              color: rt.color,
+            }}>
+              {rt.label}
+            </span>
             {/* Status badge */}
             <span style={{
               padding: '4px 12px',
@@ -148,6 +214,26 @@ export default function CasePanel({ case: c, onClose }) {
         {/* ── SCROLLABLE BODY ── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 
+          {/* ── PARENT CASE LINK (Migration 004) ────────────────────────────────
+              If this case was converted from a re-consult, show the parent case ID
+              as a subtle info banner at the top of the panel body. */}
+          {c.parent_case_id && (
+            <div style={{
+              padding: '10px 14px',
+              backgroundColor: '#F5F3FF',
+              border: '1px solid #DDD6FE',
+              borderRadius: '10px',
+              marginBottom: '16px',
+              fontSize: '12px',
+              color: '#7C3AED',
+            }}>
+              <span style={{ fontWeight: '600' }}>Converted from re-consult</span>
+              <span style={{ marginLeft: '6px', opacity: 0.7 }}>
+                (parent: {c.parent_case_id.slice(0, 8)}...)
+              </span>
+            </div>
+          )}
+
           {/* ── SURGERY DETAILS ── */}
           <Section title="Surgery Details">
             <Row label="Procedure"  value={c.procedure} />
@@ -169,11 +255,72 @@ export default function CasePanel({ case: c, onClose }) {
             {c.notes && <Row label="Notes" value={c.notes} />}
           </Section>
 
-          {/* ── FEE ── */}
-          <Section title="Fee Budget">
-            <Row label="Min Fee" value={formatFee(c.fee_min)} />
-            <Row label="Max Fee" value={formatFee(c.fee_max)} />
+          {/* ── FEE (Updated Migration 001) ────────────────────────────────────
+              Shows single flat fee instead of old fee_min/fee_max range.
+              Falls back to fee_max for backward compatibility with older cases. */}
+          <Section title="Fee">
+            <Row label="Surgeon Fee" value={formatFee(c.fee || c.fee_max)} />
+            {/* Show legacy range if fee is absent and fee_min exists (old cases) */}
+            {!c.fee && c.fee_min && (
+              <Row label="Fee Range" value={`${formatFee(c.fee_min)} – ${formatFee(c.fee_max)}`} />
+            )}
           </Section>
+
+          {/* ── SURGERY RECOMMENDATION (Migration 004) ──────────────────────────
+              For re-consult cases, show the surgeon's recommendation if one exists.
+              Fetched on panel open via GET /api/cases/:caseId/recommendation. */}
+          {c.request_type === 'reconsult' && (
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{
+                fontSize: '11px', fontWeight: '600',
+                color: '#8B8B8B', textTransform: 'uppercase',
+                letterSpacing: '0.06em', marginBottom: '8px',
+              }}>
+                Surgery Recommendation
+              </p>
+
+              {recLoading && (
+                <p style={{ fontSize: '13px', color: '#8B8B8B', fontStyle: 'italic' }}>
+                  Loading recommendation...
+                </p>
+              )}
+
+              {!recLoading && !recommendation && (
+                <p style={{ fontSize: '13px', color: '#8B8B8B', fontStyle: 'italic' }}>
+                  No recommendation submitted yet
+                </p>
+              )}
+
+              {!recLoading && recommendation && (
+                <div style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #E8E0D8',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                }}>
+                  <Row label="Procedure" value={recommendation.suggested_procedure} />
+                  <Row label="Urgency" value={
+                    <span style={{
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      backgroundColor: recommendation.urgency === 'urgent' ? '#FEF2F2' : '#F3F4F6',
+                      color: recommendation.urgency === 'urgent' ? '#DC2626' : '#6B7280',
+                    }}>
+                      {recommendation.urgency === 'urgent' ? 'Urgent' : 'Elective'}
+                    </span>
+                  } />
+                  {recommendation.recommendation_notes && (
+                    <Row label="Notes" value={recommendation.recommendation_notes} />
+                  )}
+                  {recommendation.surgeons && (
+                    <Row label="By" value={recommendation.surgeons.name} />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── CLINICAL DOCUMENTS ────────────────────────────────────────────
               Shows all files uploaded by the hospital when posting the case.

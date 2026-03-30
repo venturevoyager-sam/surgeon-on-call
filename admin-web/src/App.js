@@ -55,10 +55,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
 
   const tabs = [
-    { id: 'overview',  label: '📊 Overview' },
-    { id: 'cases',     label: '🏥 Cases' },
-    { id: 'surgeons',  label: '👨‍⚕️ Surgeons' },
-    { id: 'earnings',  label: '💰 Earnings' },
+    { id: 'overview',   label: '📊 Overview' },
+    { id: 'cases',      label: '🏥 Cases' },
+    { id: 'surgeons',   label: '👨‍⚕️ Surgeons' },
+    { id: 'hospitals',  label: '🏨 Hospitals' },
+    { id: 'earnings',   label: '💰 Earnings' },
   ];
 
   return (
@@ -97,10 +98,11 @@ export default function App() {
 
       {/* ── TAB CONTENT ── */}
       <div className="max-w-7xl mx-auto px-8 py-8">
-        {activeTab === 'overview'  && <OverviewTab />}
-        {activeTab === 'cases'     && <CasesTab />}
-        {activeTab === 'surgeons'  && <SurgeonsTab />}
-        {activeTab === 'earnings'  && <EarningsTab />}
+        {activeTab === 'overview'   && <OverviewTab />}
+        {activeTab === 'cases'      && <CasesTab />}
+        {activeTab === 'surgeons'   && <SurgeonsTab />}
+        {activeTab === 'hospitals'  && <HospitalsTab />}
+        {activeTab === 'earnings'   && <EarningsTab />}
       </div>
     </div>
   );
@@ -197,6 +199,11 @@ function CasesTab() {
   const [filter,         setFilter]         = useState('all');
   const [actionMsg,      setActionMsg]      = useState('');
 
+  // ── Search state — debounced search query sent to backend ──
+  const [searchInput, setSearchInput] = useState('');   // raw input value
+  const [searchQuery, setSearchQuery] = useState('');   // debounced value sent to API
+  const [searching,   setSearching]   = useState(false);
+
   // ── NEW: selected case for the slide-out panel ──
   const [selectedCase,   setSelectedCase]   = useState(null);
 
@@ -206,19 +213,28 @@ function CasesTab() {
   const [selectedSurgeon, setSelectedSurgeon] = useState('');
   const [reassigning,    setReassigning]    = useState(false);
 
+  // Debounce search input — waits 300ms after last keystroke before updating
+  // the searchQuery state, which triggers a new fetch via useCallback dependency.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const fetchCases = useCallback(async () => {
     setLoading(true);
+    setSearching(!!searchQuery);
     try {
-      const res = await axios.get(`${API_URL}/api/admin/cases`, {
-        params: { status: filter }
-      });
+      const params = { status: filter };
+      if (searchQuery) params.search = searchQuery;
+      const res = await axios.get(`${API_URL}/api/admin/cases`, { params });
       setCases(res.data.cases || []);
     } catch (err) {
       console.error('Failed to fetch cases:', err);
     } finally {
       setLoading(false);
+      setSearching(false);
     }
-  }, [filter]);
+  }, [filter, searchQuery]);
 
   useEffect(() => { fetchCases(); }, [fetchCases]);
 
@@ -312,6 +328,24 @@ function CasesTab() {
         ))}
       </div>
 
+      {/* Search input — sends ?search= to backend, debounced 300ms */}
+      <div className="relative mb-4">
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by procedure, patient name, case number, or hospital..."
+          className="w-full px-4 py-2.5 pl-10 rounded-lg border border-gray-200 text-sm
+            focus:outline-none focus:border-blue-400 transition"
+        />
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+        {searching && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+            searching...
+          </span>
+        )}
+      </div>
+
       {loading ? <Spinner /> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {cases.length === 0 ? (
@@ -351,7 +385,7 @@ function CasesTab() {
                         <span className="text-xs text-gray-400">{c.hospitals?.city}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{formatDate(c.surgery_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{formatFee(c.fee_max)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{formatFee(c.fee || c.fee_max)}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {c.surgeons?.name || <span className="text-gray-400 italic">Not assigned</span>}
                       </td>
@@ -447,19 +481,33 @@ function SurgeonsTab() {
   const [filter,   setFilter]   = useState('all');
   const [actionMsg, setActionMsg] = useState('');
 
+  // ── Search state — debounced search query sent to backend ──
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching,   setSearching]   = useState(false);
+
+  // Debounce search input — waits 300ms after last keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const fetchSurgeons = useCallback(async () => {
     setLoading(true);
+    setSearching(!!searchQuery);
     try {
-      const filterParam = filter === 'verified' ? { available: 'true' }
+      const params = filter === 'verified' ? { available: 'true' }
         : filter === 'pending' ? { available: 'false' } : {};
-      const res = await axios.get(`${API_URL}/api/admin/surgeons`, { params: filterParam });
+      if (searchQuery) params.search = searchQuery;
+      const res = await axios.get(`${API_URL}/api/admin/surgeons`, { params });
       setSurgeons(res.data.surgeons || []);
     } catch (err) {
       console.error('Failed to fetch surgeons:', err);
     } finally {
       setLoading(false);
+      setSearching(false);
     }
-  }, [filter]);
+  }, [filter, searchQuery]);
 
   useEffect(() => { fetchSurgeons(); }, [fetchSurgeons]);
 
@@ -511,6 +559,24 @@ function SurgeonsTab() {
               : 'All'}
           </button>
         ))}
+      </div>
+
+      {/* Search input — sends ?search= to backend, debounced 300ms */}
+      <div className="relative mb-4">
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by name, city, or specialty..."
+          className="w-full px-4 py-2.5 pl-10 rounded-lg border border-gray-200 text-sm
+            focus:outline-none focus:border-blue-400 transition"
+        />
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+        {searching && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+            searching...
+          </span>
+        )}
       </div>
 
       {loading ? <Spinner /> : (
@@ -669,6 +735,188 @@ function EarningsTab() {
     </div>
   );
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HOSPITALS TAB
+// Shows all hospitals with search and verify/unverify actions.
+// Fetches from GET /api/admin/hospitals.
+// Verify/Unverify calls PATCH /api/admin/hospitals/:id/verify.
+// ══════════════════════════════════════════════════════════════════════════════
+
+function HospitalsTab() {
+  const [hospitals, setHospitals] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [actionMsg, setActionMsg] = useState('');
+
+  // Search state — filters client-side by name, city, or contact email
+  const [searchInput, setSearchInput] = useState('');
+
+  // Track which hospital is currently being verified/unverified (by ID)
+  const [verifyingId, setVerifyingId] = useState(null);
+
+  // Fetch hospitals from backend
+  const fetchHospitals = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/hospitals`);
+      setHospitals(res.data.hospitals || []);
+    } catch (err) {
+      console.error('Failed to fetch hospitals:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchHospitals(); }, [fetchHospitals]);
+
+  // Flash action message for 3 seconds
+  const showMsg = (msg) => {
+    setActionMsg(msg);
+    setTimeout(() => setActionMsg(''), 3000);
+  };
+
+  // Verify or unverify a hospital
+  const handleVerify = async (hospitalId, newVerified) => {
+    setVerifyingId(hospitalId);
+    try {
+      await axios.patch(`${API_URL}/api/admin/hospitals/${hospitalId}/verify`, {
+        verified: newVerified,
+      });
+      showMsg(`Hospital ${newVerified ? 'verified' : 'unverified'} successfully`);
+      fetchHospitals();
+    } catch (err) {
+      showMsg('Failed to update hospital');
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  // Client-side search filter — matches name, city, or contact email
+  const filtered = hospitals.filter(h => {
+    if (!searchInput.trim()) return true;
+    const q = searchInput.toLowerCase();
+    return (
+      (h.name || '').toLowerCase().includes(q) ||
+      (h.city || '').toLowerCase().includes(q) ||
+      (h.contact_email || '').toLowerCase().includes(q)
+    );
+  });
+
+  // Hospital type display labels
+  const typeLabels = {
+    private:      'Private',
+    corporate:    'Corporate',
+    nursing_home: 'Nursing Home',
+    clinic:       'Clinic',
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-blue-900">Hospitals</h2>
+        {actionMsg && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm">
+            ✓ {actionMsg}
+          </div>
+        )}
+      </div>
+
+      {/* Search input — filters client-side by name, city, or email */}
+      <div className="relative mb-4">
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by name, city, or contact email..."
+          className="w-full px-4 py-2.5 pl-10 rounded-lg border border-gray-200 text-sm
+            focus:outline-none focus:border-blue-400 transition"
+        />
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+      </div>
+
+      {loading ? <Spinner /> : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {filtered.length === 0 ? (
+            <div className="p-12 text-center text-gray-400">No hospitals found</div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  {['Hospital', 'City', 'Contact', 'Phone', 'Beds', 'Type', 'Verified', 'Actions'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(h => (
+                  <tr key={h.id} className="hover:bg-gray-50 transition">
+                    {/* Hospital name */}
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-semibold text-gray-800">{h.name}</div>
+                    </td>
+
+                    {/* City */}
+                    <td className="px-4 py-3 text-sm text-gray-600">{h.city || '—'}</td>
+
+                    {/* Contact name + email */}
+                    <td className="px-4 py-3">
+                      <div className="text-sm text-gray-800">{h.contact_name || '—'}</div>
+                      <div className="text-xs text-gray-400">{h.contact_email || '—'}</div>
+                    </td>
+
+                    {/* Phone */}
+                    <td className="px-4 py-3 text-sm text-gray-600">{h.contact_phone || '—'}</td>
+
+                    {/* Bed count */}
+                    <td className="px-4 py-3 text-sm text-gray-600">{h.bed_count || '—'}</td>
+
+                    {/* Hospital type */}
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {typeLabels[h.hospital_type] || h.hospital_type || '—'}
+                    </td>
+
+                    {/* Verified badge */}
+                    <td className="px-4 py-3">
+                      {h.verified ? (
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-semibold">
+                          Verified
+                        </span>
+                      ) : (
+                        <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-semibold">
+                          Unverified
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-3">
+                      {h.verified ? (
+                        <ActionBtn
+                          onClick={() => handleVerify(h.id, false)}
+                          color="red"
+                        >
+                          {verifyingId === h.id ? '...' : 'Unverify'}
+                        </ActionBtn>
+                      ) : (
+                        <ActionBtn
+                          onClick={() => handleVerify(h.id, true)}
+                          color="green"
+                        >
+                          {verifyingId === h.id ? '...' : 'Verify'}
+                        </ActionBtn>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SHARED UI COMPONENTS

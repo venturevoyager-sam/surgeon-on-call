@@ -37,7 +37,26 @@ export default function HomeScreen({ navigation, surgeonId }) {
       setAvailable(surgeonData.available);
 
       const requestsRes = await axios.get(`${CONFIG.API_URL}/api/surgeons/${surgeonId}/requests`);
-      setIncomingRequests(requestsRes.data.incoming_requests || []);
+
+      // ── Sort incoming requests by urgency ────────────────────────────────
+      // 1. Emergency cases always pinned to top
+      // 2. Non-emergency sorted by expires_at ascending (soonest deadline first)
+      // 3. Requests with no expires_at sink to the bottom
+      const sorted = [...(requestsRes.data.incoming_requests || [])].sort((a, b) => {
+        const aEmergency = a.request_type === 'emergency';
+        const bEmergency = b.request_type === 'emergency';
+
+        // Emergency cases always come first
+        if (aEmergency && !bEmergency) return -1;
+        if (!aEmergency && bEmergency) return 1;
+
+        // Within the same group, sort by soonest expires_at
+        const aExp = a.expires_at ? new Date(a.expires_at).getTime() : Infinity;
+        const bExp = b.expires_at ? new Date(b.expires_at).getTime() : Infinity;
+        return aExp - bExp;
+      });
+
+      setIncomingRequests(sorted);
       setUpcomingCases(requestsRes.data.upcoming_cases || []);
       setError('');
     } catch (err) {

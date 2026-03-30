@@ -6,12 +6,15 @@
  *   Left  — brand panel (dark charcoal, logo, tagline, trust signals)
  *   Right — email + password form (warm cream background)
  *
- * Auth: Supabase signInWithPassword
+ * Auth: Custom hospital_auth table + bcrypt (via POST /api/hospitals/login).
+ * No Supabase Auth — uses same pattern as surgeon login.
  */
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 export default function Login() {
   const navigate = useNavigate();
@@ -36,18 +39,21 @@ export default function Login() {
     setError('');
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
+      // Custom auth via hospital_auth table + bcrypt (no Supabase Auth)
+      const res = await axios.post(`${API_URL}/api/hospitals/login`, {
+        email: email.trim(),
         password,
       });
 
-      if (authError) throw authError;
+      // Save hospital_id and name to localStorage for session management
+      localStorage.setItem('hospital_id', res.data.hospital_id);
+      localStorage.setItem('hospital_name', res.data.hospital_name);
 
       // Success — redirect to dashboard
       navigate('/dashboard');
 
     } catch (err) {
-      setError(err.message || 'Sign in failed. Please try again.');
+      setError(err.response?.data?.message || 'Sign in failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -263,14 +269,35 @@ export default function Login() {
 
           </form>
 
+          {/* Register link */}
+          <p style={{
+            marginTop: '24px',
+            textAlign: 'center',
+            fontSize: '14px',
+            color: '#8B8B8B',
+          }}>
+            New hospital?{' '}
+            <span
+              onClick={() => navigate('/register')}
+              style={{
+                color: '#E56717',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+            >
+              Register here
+            </span>
+          </p>
+
           {/* Footer */}
           <p style={{
-            marginTop: '28px',
+            marginTop: '16px',
             color: '#8B8B8B', fontSize: '12px',
             textAlign: 'center', lineHeight: '1.6',
           }}>
-            Only verified hospital accounts can access this portal.<br />
-            Contact support to register your hospital.
+            Only verified hospital accounts can access this portal.
           </p>
 
         </div>

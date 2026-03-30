@@ -11,34 +11,24 @@
  * Sections:
  *   1 — Surgery Details (procedure, specialty, date/time, duration, OT)
  *   2 — Patient Details (name, age, gender)
- *   3 — Surgeon Fee Budget (min, max)
- *   4 — Documents (optional file upload — PDF, JPG, PNG, max 5MB each, up to 3)
+ *   3 — Surgeon Fee (single flat fee in ₹, stored as paise)
+ *   4 — Documents (optional file upload — PDF, JPG, PNG, max 5MB each, up to 5)
  *   5 — Clinical Notes (optional free text)
+ *
+ * UPDATED (Migration 001):
+ *   - Fee section changed from min/max range to single flat fee
+ *   - Submits request_type: 'elective' to backend
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 
-const SPECIALTIES = [
-  'General Surgery',
-  'Laparoscopic Surgery',
-  'Orthopaedics',
-  'Cardiothoracic Surgery',
-  'Neurosurgery',
-  'Urology',
-  'Gynaecology',
-  'Plastic Surgery',
-  'ENT Surgery',
-  'Ophthalmology',
-  'Vascular Surgery',
-  'Paediatric Surgery',
-  'Spine Surgery',
-  'Bariatric Surgery',
-];
+// SPECIALTIES: fetched from GET /api/specialties on mount (see useEffect below).
+// Removed hardcoded array — now driven by the specialties table in the database.
 
 const DURATIONS = [
   { label: '1 – 2 hours', value: 1.5 },
@@ -80,26 +70,36 @@ function fileIcon(type) {
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 export default function NewRequest() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ── RE-CONSULT CONVERSION PRE-FILL (Migration 004) ──────────────────────────
+  // When navigating from CaseDetail after converting a re-consult, the route
+  // state contains pre-fill data: specialty, patient details, suggested procedure,
+  // recommendation notes, parent case ID, and the recommending surgeon ID.
+  const reconsultData = location.state?.fromReconsult ? location.state : null;
 
   // ── STATE ─────────────────────────────────────────────────────────────────────
 
   // Hospital record for the logged-in SPOC
   const [hospital, setHospital] = useState(null);
 
+  // Specialties fetched from API — drives the specialty dropdown
+  const [specialties, setSpecialties] = useState([]);
+
   // All text/select form fields in one object
+  // If opened from a re-consult conversion, pre-fill available fields.
   const [form, setForm] = useState({
-    procedure:          '',
-    specialty_required: '',
+    procedure:          reconsultData?.suggested_procedure || '',
+    specialty_required: reconsultData?.specialty_required  || '',
     surgery_date:       '',
     surgery_time:       '',
     duration_hours:     '',
     ot_number:          '',
-    patient_name:       '',
-    patient_age:        '',
-    patient_gender:     '',
-    fee_min:            '',
-    fee_max:            '',
-    notes:              '',
+    patient_name:       reconsultData?.patient_name   || '',
+    patient_age:        reconsultData?.patient_age     ? String(reconsultData.patient_age) : '',
+    patient_gender:     reconsultData?.patient_gender  || '',
+    fee:                '',    // single flat fee in ₹ (converted to paise on submit)
+    notes:              reconsultData?.recommendation_notes || '',
   });
 
   // Field-level validation errors
@@ -125,21 +125,21 @@ export default function NewRequest() {
 
   /**
    * On mount: find the hospital record for the logged-in SPOC
-   * DEV_MODE: hardcoded email — no auth needed
+   * Uses hospital_id from localStorage (set by Login.js after custom auth login).
    */
   useEffect(() => {
     const getHospital = async () => {
-      const devEmail = 'venturevoyager.sam@gmail.com';
-      console.log('DEV_MODE: Using hardcoded email:', devEmail);
+      const hospitalId = localStorage.getItem('hospital_id');
+      if (!hospitalId) { navigate('/'); return; }
 
       const { data: hospitalData, error } = await supabase
         .from('hospitals')
         .select('*')
-        .eq('contact_email', devEmail)
+        .eq('id', hospitalId)
         .single();
 
       if (error || !hospitalData) {
-        console.error('Hospital not found for email:', devEmail);
+        console.error('Hospital not found for id:', hospitalId);
         navigate('/dashboard');
         return;
       }
@@ -150,6 +150,13 @@ export default function NewRequest() {
 
     getHospital();
   }, [navigate]);
+
+  // Fetch specialties from API on mount — replaces hardcoded array
+  useEffect(() => {
+    axios.get(`${API_URL}/api/specialties`)
+      .then(res => setSpecialties(res.data.specialties || []))
+      .catch(err => console.error('Failed to load specialties:', err));
+  }, []);
 
 
   // ── FORM HANDLERS ─────────────────────────────────────────────────────────────
@@ -172,15 +179,8 @@ export default function NewRequest() {
     if (!form.specialty_required)
       e.specialty_required = 'Please select a specialty';
 
-    if (!form.surgery_date) {
+    if (!form.surgery_date)
       e.surgery_date = 'Please select a surgery date';
-    } else {
-      const surgeryDate = new Date(form.surgery_date);
-      const minDate = new Date();
-      minDate.setHours(minDate.getHours() + 48);
-      if (surgeryDate < minDate)
-        e.surgery_date = 'Surgery date must be at least 48 hours from now';
-    }
 
     if (!form.surgery_time)
       e.surgery_time = 'Please select a surgery time';
@@ -200,14 +200,9 @@ export default function NewRequest() {
     if (!form.patient_gender)
       e.patient_gender = 'Please select patient gender';
 
-    if (!form.fee_min || Number(form.fee_min) <= 0)
-      e.fee_min = 'Please enter minimum fee';
-
-    if (!form.fee_max || Number(form.fee_max) <= 0)
-      e.fee_max = 'Please enter maximum fee';
-
-    if (Number(form.fee_max) <= Number(form.fee_min))
-      e.fee_max = 'Maximum fee must be greater than minimum fee';
+    // UPDATED (Migration 001): Single fee replaces min/max range
+    if (!form.fee || Number(form.fee) <= 0)
+      e.fee = 'Please enter the surgeon fee';
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -360,6 +355,8 @@ export default function NewRequest() {
 
       console.log('Submitting case with documents:', documentUrls);
 
+      // UPDATED (Migration 001): Sends single fee (in paise) and request_type = 'elective'
+      // UPDATED (Migration 004): Includes parent_case_id when created from a re-consult conversion
       const response = await axios.post(`${API_URL}/api/cases`, {
         hospital_id:        hospital.id,
         procedure:          form.procedure.trim(),
@@ -371,8 +368,9 @@ export default function NewRequest() {
         patient_name:       form.patient_name.trim(),
         patient_age:        Number(form.patient_age),
         patient_gender:     form.patient_gender,
-        fee_min:            Number(form.fee_min),
-        fee_max:            Number(form.fee_max),
+        fee:                Number(form.fee) * 100,  // ₹ → paise
+        request_type:       'elective',
+        parent_case_id:     reconsultData?.parent_case_id || null,  // NEW (Migration 004)
         notes:              form.notes.trim() || null,
         // Documents array — stored as JSONB in cases table
         // Each entry: { name, url, type }
@@ -382,7 +380,13 @@ export default function NewRequest() {
       console.log('Case created:', response.data);
 
       // Redirect to shortlist page
-      navigate(`/cases/${response.data.case.id}/shortlist`);
+      // UPDATED (Migration 004): Pass recommending surgeon ID so the Shortlist
+      // page can auto-add them at position #1.
+      navigate(`/cases/${response.data.case.id}/shortlist`, {
+        state: reconsultData?.recommending_surgeon_id
+          ? { recommending_surgeon_id: reconsultData.recommending_surgeon_id }
+          : undefined,
+      });
 
     } catch (err) {
       console.error('Case submission error:', err);
@@ -424,10 +428,29 @@ export default function NewRequest() {
           </p>
         </div>
 
+        {/* ── RE-CONSULT PRE-FILL BANNER (Migration 004) ──────────────────────── */}
+        {/* Shown when this form was opened from converting a re-consult case.
+            Informs the SPOC that fields have been pre-filled from the surgeon's
+            recommendation so they can review and adjust before submitting. */}
+        {reconsultData && (
+          <div className="mb-6 p-4 rounded-lg flex items-start gap-3"
+            style={{ backgroundColor: '#FFF7F0', border: '1px solid #F5D9C0' }}>
+            <span className="text-lg mt-0.5">💡</span>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: '#444444' }}>
+                Pre-filled from re-consult recommendation
+              </p>
+              <p className="text-xs mt-1" style={{ color: '#8B8B8B' }}>
+                Procedure, patient details, and notes have been carried over. Review and adjust as needed before submitting.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ── SUBMIT ERROR ─────────────────────────────────────────────────────── */}
         {submitError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-            ❌ {submitError}
+            {submitError}
           </div>
         )}
 
@@ -467,9 +490,9 @@ export default function NewRequest() {
                   onChange={e => handleChange('specialty_required', e.target.value)}
                   className={`input-field ${errors.specialty_required ? 'input-field-error' : ''}`}
                 >
-                  <option value="">Select specialty...</option>
-                  {SPECIALTIES.map(s => (
-                    <option key={s} value={s}>{s}</option>
+                  <option value="">{specialties.length === 0 ? 'Loading specialties...' : 'Select specialty...'}</option>
+                  {specialties.map(s => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
                   ))}
                 </select>
                 {errors.specialty_required && <p className="field-error">{errors.specialty_required}</p>}
@@ -482,8 +505,13 @@ export default function NewRequest() {
                   type="date"
                   value={form.surgery_date}
                   onChange={e => handleChange('surgery_date', e.target.value)}
+                  min={new Date().toISOString().slice(0, 10)}
                   className={`input-field ${errors.surgery_date ? 'input-field-error' : ''}`}
                 />
+                <div className="flex gap-2 mt-1">
+                  <button type="button" className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-body" onClick={() => handleChange('surgery_date', new Date().toISOString().slice(0, 10))}>Today</button>
+                  <button type="button" className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-body" onClick={() => { const d = new Date(); d.setDate(d.getDate() + 1); handleChange('surgery_date', d.toISOString().slice(0, 10)); }}>Tomorrow</button>
+                </div>
                 {errors.surgery_date && <p className="field-error">{errors.surgery_date}</p>}
               </div>
 
@@ -591,44 +619,30 @@ export default function NewRequest() {
 
 
           {/* ════════════════════════════════════════════════════════════════════
-              SECTION 3: SURGEON FEE BUDGET
+              SECTION 3: SURGEON FEE
+              UPDATED (Migration 001): Single flat fee replaces min/max range.
+              Stored in paise (₹ × 100) in the database.
           ════════════════════════════════════════════════════════════════════ */}
           <div className="card mb-6">
             <h3 className="card-section-title">
               <span className="section-badge">3</span>
-              Surgeon Fee Budget
+              Surgeon Fee
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
-
-              {/* Fee Min */}
-              <div>
-                <label className="form-label">Minimum Fee (₹) *</label>
-                <input
-                  type="number"
-                  value={form.fee_min}
-                  onChange={e => handleChange('fee_min', e.target.value)}
-                  placeholder="e.g. 15000"
-                  min="0"
-                  className={`input-field ${errors.fee_min ? 'input-field-error' : ''}`}
-                />
-                {errors.fee_min && <p className="field-error">{errors.fee_min}</p>}
-              </div>
-
-              {/* Fee Max */}
-              <div>
-                <label className="form-label">Maximum Fee (₹) *</label>
-                <input
-                  type="number"
-                  value={form.fee_max}
-                  onChange={e => handleChange('fee_max', e.target.value)}
-                  placeholder="e.g. 25000"
-                  min="0"
-                  className={`input-field ${errors.fee_max ? 'input-field-error' : ''}`}
-                />
-                {errors.fee_max && <p className="field-error">{errors.fee_max}</p>}
-              </div>
-
+            <div>
+              <label className="form-label">Fee (₹) *</label>
+              <input
+                type="number"
+                value={form.fee}
+                onChange={e => handleChange('fee', e.target.value)}
+                placeholder="e.g. 25000"
+                min="0"
+                className={`input-field ${errors.fee ? 'input-field-error' : ''}`}
+              />
+              {errors.fee && <p className="field-error">{errors.fee}</p>}
+              <p className="text-xs text-muted mt-1">
+                This is the total fee offered to the surgeon. Platform deducts 5% commission.
+              </p>
             </div>
           </div>
 

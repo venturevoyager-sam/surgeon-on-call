@@ -33,9 +33,11 @@ const cron = require('node-cron');
 const { notifySurgeryReminder } = require('./notifications');
 
 // ── ROUTE IMPORTS ─────────────────────────────────────────────────────────────
-const casesRouter = require('./routes/cases');
-const surgeonsRouter = require('./routes/surgeons');
-const adminRouter = require('./routes/admin');
+const casesRouter       = require('./routes/cases');
+const surgeonsRouter    = require('./routes/surgeons');
+const adminRouter       = require('./routes/admin');
+const hospitalsRouter   = require('./routes/hospitals');
+const specialtiesRouter = require('./routes/specialties');
 
 // ── CONFIGURATION ─────────────────────────────────────────────────────────────
 const app = express();
@@ -75,9 +77,11 @@ app.get('/', async (req, res) => {
 });
 
 
-app.use('/api/surgeons', surgeonsRouter);
-app.use('/api/cases', casesRouter);
-app.use('/api/admin', adminRouter);
+app.use('/api/surgeons',     surgeonsRouter);
+app.use('/api/cases',        casesRouter);
+app.use('/api/admin',        adminRouter);
+app.use('/api/hospitals',    hospitalsRouter);
+app.use('/api/specialties',  specialtiesRouter);
 
 // ── GLOBAL ERROR HANDLER ──────────────────────────────────────────────────────
 // Catches any unhandled errors thrown anywhere in the app

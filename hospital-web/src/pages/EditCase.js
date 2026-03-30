@@ -24,12 +24,8 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-const SPECIALTIES = [
-  'General Surgery', 'Laparoscopic Surgery', 'Orthopaedics',
-  'Cardiothoracic Surgery', 'Neurosurgery', 'Urology', 'Gynaecology',
-  'Plastic Surgery', 'ENT Surgery', 'Ophthalmology', 'Vascular Surgery',
-  'Paediatric Surgery', 'Spine Surgery', 'Bariatric Surgery',
-];
+// SPECIALTIES array removed — was dead code (never referenced in JSX).
+// EditCase uses surgeon.specialty[] from the pre-assigned surgeon, not a global list.
 
 const DURATIONS = [
   { label: '1 – 2 hours', value: 1.5 },
@@ -94,13 +90,14 @@ export default function EditCase() {
   // ── LOAD CASE + HOSPITAL ───────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
-      const devEmail = 'venturevoyager.sam@gmail.com';
+      // Uses hospital_id from localStorage (set by Login.js after custom auth login)
+      const hospitalId = localStorage.getItem('hospital_id');
 
       // Get hospital
       const { data: hosp } = await supabase
         .from('hospitals')
         .select('*')
-        .eq('contact_email', devEmail)
+        .eq('id', hospitalId)
         .single();
       setHospital(hosp);
 

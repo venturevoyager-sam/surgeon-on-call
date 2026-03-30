@@ -3,7 +3,7 @@
  * Company: Vaidhya Healthcare Pvt Ltd
  *
  * Endpoints:
- * - POST /api/cases/draft        → Create empty draft case with pre-assigned surgeon (NEW)
+ * - POST /api/cases/draft        → Create empty draft case with pre-assigned surgeon
  * - POST /api/cases              → Create a full new surgery request
  * - GET  /api/cases              → List cases for a hospital
  * - GET  /api/cases/:id/matches  → Get matched surgeons for a case
@@ -14,6 +14,15 @@
  * - GET  /api/cases/:caseId/surgeon-view → Case detail for surgeon mobile app
  * - PATCH /api/cases/:caseId/accept  → Surgeon accepts
  * - PATCH /api/cases/:caseId/decline → Surgeon declines
+ * - POST  /api/cases/:caseId/recommend     → Surgeon submits surgery recommendation
+ * - GET   /api/cases/:caseId/recommendation → Get recommendation for a case
+ * - PATCH /api/cases/:caseId/convert        → Hospital converts re-consult to surgery
+ *
+ * SCHEMA UPDATE (Migration 001):
+ *   - cases.request_type  TEXT NOT NULL DEFAULT 'elective'
+ *       Allowed values: 'elective', 'emergency', 'opd', 'reconsult'
+ *   - cases.fee           INTEGER (paise, nullable) — flat fee replacing fee_min/fee_max
+ *   - cases.fee_min / fee_max are now NULLABLE (kept for backward compat, not used in new logic)
  */
 
 const express = require('express');
@@ -21,6 +30,29 @@ const router  = express.Router();
 const supabase = require('../supabase');
 const logger   = require('../logger');
 const { notifyNewCase, notifyCasePassed } = require('../notifications');
+
+// ── Valid request_type values (added in Migration 001) ──────────────────────
+// 'elective'   — planned/scheduled surgery (default)
+// 'emergency'  — urgent, skip 48hr lead time, skip shortlist
+// 'opd'        — outpatient consultation, skip shortlist if same-day
+// 'reconsult'  — follow-up consultation
+const VALID_REQUEST_TYPES = ['elective', 'emergency', 'opd', 'reconsult'];
+
+/**
+ * Compute whether the frontend should skip the shortlist page and go
+ * straight to cascade. Rules:
+ *   - emergency → always skip (time-critical)
+ *   - opd with surgery_date = today → skip (same-day OPD)
+ *   - elective / reconsult / future-dated opd → do NOT skip
+ */
+function computeSkipShortlist(request_type, surgery_date) {
+  if (request_type === 'emergency') return true;
+  if (request_type === 'opd' && surgery_date) {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    return surgery_date === today;
+  }
+  return false;
+}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -71,7 +103,12 @@ router.post('/draft', async (req, res) => {
     }
 
     // ── Create the draft case ──────────────────────────────────────────────
-    // All clinical fields are null — hospital fills them in on the EditCase page
+    // All clinical fields are null — hospital fills them in on the EditCase page.
+    //
+    // UPDATED (Migration 001): Accept optional request_type and fee fields.
+    // fee_min / fee_max kept for backward compat but no longer required.
+    const { request_type, fee, fee_min, fee_max } = req.body;
+
     const { data: newCase, error: caseError } = await supabase
       .from('cases')
       .insert({
@@ -79,6 +116,11 @@ router.post('/draft', async (req, res) => {
         confirmed_surgeon_id: pre_assigned_surgeon,
         status:               'draft',
         payment_status:       'pending',
+        // request_type defaults to 'elective' at DB level if not provided
+        request_type:       request_type || 'elective',
+        fee:                fee   || null,    // flat fee (paise), nullable
+        fee_min:            fee_min || null,   // backward compat, nullable
+        fee_max:            fee_max || null,   // backward compat, nullable
         // Clinical fields — intentionally null, filled later
         procedure:          null,
         specialty_required: null,
@@ -89,8 +131,6 @@ router.post('/draft', async (req, res) => {
         patient_name:       null,
         patient_age:        null,
         patient_gender:     null,
-        fee_min:            null,
-        fee_max:            null,
         notes:              null,
         documents:          null,
       })
@@ -140,33 +180,52 @@ router.post('/', async (req, res) => {
       patient_name,
       patient_age,
       patient_gender,
-      fee_min,
-      fee_max,
+      fee,            // NEW (Migration 001): flat fee in paise — required
+      fee_min,        // DEPRECATED: kept for backward compat, no longer required
+      fee_max,        // DEPRECATED: kept for backward compat, no longer required
+      request_type,   // NEW (Migration 001): 'elective' | 'emergency' | 'opd' | 'reconsult'
+      parent_case_id, // NEW (Migration 004): links back to the originating re-consult case
       notes,
       documents,
     } = req.body;
 
     // ── Validation ─────────────────────────────────────────────────────────
-    const required = [
-      'hospital_id', 'procedure', 'specialty_required',
-      'surgery_date', 'surgery_time', 'duration_hours',
-      'ot_number', 'patient_name', 'patient_age',
-      'patient_gender', 'fee_min', 'fee_max',
-    ];
+    // UPDATED (Migration 001):
+    //   - fee_min / fee_max removed from required list (nullable now)
+    //   - fee is required (flat fee replaces range for new cases)
+    //   - request_type validated against allowed values
+    // OPD consultations don't require patient details — just time/date and fee
+    const resolvedRequestType = request_type || 'elective';
+    const required = resolvedRequestType === 'opd'
+      ? ['hospital_id', 'procedure', 'specialty_required',
+         'surgery_date', 'surgery_time', 'fee']
+      : ['hospital_id', 'procedure', 'specialty_required',
+         'surgery_date', 'surgery_time', 'duration_hours',
+         'ot_number', 'patient_name', 'patient_age',
+         'patient_gender', 'fee'];
 
     for (const field of required) {
-      if (!req.body[field]) {
+      if (req.body[field] === undefined || req.body[field] === null || req.body[field] === '') {
         logger.warn('Missing required field', { field });
         return res.status(400).json({ message: `Missing required field: ${field}` });
       }
     }
 
+    // Validate request_type if provided (defaults to 'elective')
+    if (!VALID_REQUEST_TYPES.includes(resolvedRequestType)) {
+      logger.warn('Invalid request_type', { request_type: resolvedRequestType });
+      return res.status(400).json({
+        message: `Invalid request_type: ${resolvedRequestType}. Must be one of: ${VALID_REQUEST_TYPES.join(', ')}`
+      });
+    }
+
     // ── Verify hospital ────────────────────────────────────────────────────
+    // UPDATED (Migration 005): Include lat/lng for distance-based matching
     logger.info('Verifying hospital', { hospital_id });
 
     const { data: hospital, error: hospitalError } = await supabase
       .from('hospitals')
-      .select('id, name, city, verified')
+      .select('id, name, city, lat, lng, verified')
       .eq('id', hospital_id)
       .single();
 
@@ -184,7 +243,10 @@ router.post('/', async (req, res) => {
 
     logger.info('Hospital verified', { hospital_name: hospital.name, city: hospital.city });
 
+
     // ── Save case ──────────────────────────────────────────────────────────
+    // UPDATED (Migration 001): Saves request_type and fee.
+    // fee_min / fee_max still accepted for backward compat but not required.
     logger.info('Saving case to database');
 
     const { data: newCase, error: caseError } = await supabase
@@ -200,8 +262,11 @@ router.post('/', async (req, res) => {
         patient_name,
         patient_age,
         patient_gender,
-        fee_min,
-        fee_max,
+        request_type:   resolvedRequestType,   // NEW — case classification
+        fee:            fee,                    // NEW — flat fee in paise
+        fee_min:        fee_min || null,        // backward compat, nullable
+        fee_max:        fee_max || null,        // backward compat, nullable
+        parent_case_id: parent_case_id || null,  // NEW (Migration 004): link to originating re-consult
         notes:     notes     || null,
         documents: documents || null,
         status:         'active',
@@ -222,26 +287,34 @@ router.post('/', async (req, res) => {
     });
 
     // ── Run matching ───────────────────────────────────────────────────────
+    // UPDATED (Migration 005): Distance-based matching replaces city matching.
+    // Hospital lat/lng passed to the matcher for haversine distance scoring.
     logger.info('Running matching algorithm', {
-      specialty: specialty_required,
-      city:      hospital.city,
+      specialty:    specialty_required,
+      hospital_lat: hospital.lat,
+      hospital_lng: hospital.lng,
     });
 
     const matchedSurgeons = await matchSurgeons({
       specialty_required,
       surgery_date,
       surgery_time,
-      city: hospital.city,
-      fee_min,
-      fee_max,
+      hospital_lat: hospital.lat,
+      hospital_lng: hospital.lng,
+      limit: resolvedRequestType === 'emergency' ? 0 : 7,  // 0 = no limit for emergency
     });
 
     logger.info('Matching complete', { surgeons_found: matchedSurgeons.length });
+
+    // ADDED (Migration 001): Tell the frontend whether to skip the shortlist
+    // page and go straight to cascade (emergency or same-day OPD).
+    const skip_shortlist = computeSkipShortlist(resolvedRequestType, surgery_date);
 
     return res.status(201).json({
       message:          'Case created successfully',
       case:             newCase,
       matched_surgeons: matchedSurgeons,
+      skip_shortlist,   // NEW — frontend uses this to decide navigation
     });
 
   } catch (error) {
@@ -318,7 +391,7 @@ router.get('/:id/matches', async (req, res) => {
     // Get hospital city
     const { data: hospital, error: hospitalError } = await supabase
       .from('hospitals')
-      .select('city')
+      .select('city, lat, lng')
       .eq('id', case_.hospital_id)
       .single();
 
@@ -326,17 +399,19 @@ router.get('/:id/matches', async (req, res) => {
       logger.warn('Hospital not found for case', { hospital_id: case_.hospital_id });
     }
 
-    const city = hospital?.city || '';
-    logger.info('Fetched hospital city for matching', { city });
+    logger.info('Fetched hospital location for matching', {
+      lat: hospital?.lat,
+      lng: hospital?.lng,
+    });
 
     // Run matching
+    // UPDATED (Migration 005): Distance-based matching using hospital lat/lng.
     const matchedSurgeons = await matchSurgeons({
       specialty_required: case_.specialty_required,
       surgery_date:       case_.surgery_date,
       surgery_time:       case_.surgery_time,
-      city,
-      fee_min:            case_.fee_min,
-      fee_max:            case_.fee_max,
+      hospital_lat:       hospital?.lat,
+      hospital_lng:       hospital?.lng,
     });
 
     logger.info('Matches fetched', {
@@ -349,6 +424,278 @@ router.get('/:id/matches', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching matches', { error: error.message });
     return res.status(500).json({ message: 'Failed to fetch matches' });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/cases/:caseId/recommend
+// Surgeon submits a surgery recommendation for a re-consult case.
+// After an OPD/re-consult, the surgeon may recommend a follow-up surgery.
+// This stores the recommendation for the hospital SPOC to review.
+//
+// Called by: Surgeon Mobile App — RequestDetailScreen (re-consult flow)
+//
+// IMPORTANT: Must be defined BEFORE GET /:id so Express doesn't match
+// the literal "recommend" as a UUID parameter.
+//
+// SCHEMA (Migration 004):
+//   surgery_recommendations(id, case_id, surgeon_id, suggested_procedure,
+//     recommendation_notes, urgency, status, created_at)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/:caseId/recommend', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { surgeon_id, suggested_procedure, recommendation_notes, urgency } = req.body;
+
+    logger.info('Surgery recommendation submitted', {
+      case_id: caseId,
+      surgeon_id,
+      suggested_procedure,
+      urgency,
+    });
+
+    // ── Validate required fields ─────────────────────────────────────────
+    if (!surgeon_id) {
+      return res.status(400).json({ message: 'surgeon_id is required' });
+    }
+    if (!suggested_procedure || !suggested_procedure.trim()) {
+      return res.status(400).json({ message: 'suggested_procedure is required' });
+    }
+    if (!urgency || !['elective', 'urgent'].includes(urgency)) {
+      return res.status(400).json({
+        message: 'urgency is required and must be "elective" or "urgent"'
+      });
+    }
+
+    // ── Verify case exists and is a re-consult ───────────────────────────
+    const { data: case_, error: caseError } = await supabase
+      .from('cases')
+      .select('id, request_type, confirmed_surgeon_id, status')
+      .eq('id', caseId)
+      .single();
+
+    if (caseError || !case_) {
+      logger.warn('Case not found for recommendation', { case_id: caseId });
+      return res.status(404).json({ message: 'Case not found' });
+    }
+
+    if (case_.request_type !== 'reconsult') {
+      logger.warn('Recommendation rejected — case is not a re-consult', {
+        case_id: caseId,
+        request_type: case_.request_type,
+      });
+      return res.status(400).json({
+        message: 'Surgery recommendations can only be made on re-consult cases'
+      });
+    }
+
+    // ── Verify surgeon is the confirmed surgeon on this case ─────────────
+    if (case_.confirmed_surgeon_id !== surgeon_id) {
+      logger.warn('Recommendation rejected — surgeon is not the confirmed surgeon', {
+        case_id: caseId,
+        surgeon_id,
+        confirmed_surgeon_id: case_.confirmed_surgeon_id,
+      });
+      return res.status(403).json({
+        message: 'Only the confirmed surgeon on this case can make recommendations'
+      });
+    }
+
+    // ── Insert the recommendation ────────────────────────────────────────
+    const { data: recommendation, error: insertError } = await supabase
+      .from('surgery_recommendations')
+      .insert({
+        case_id:               caseId,
+        surgeon_id,
+        suggested_procedure:   suggested_procedure.trim(),
+        recommendation_notes:  recommendation_notes?.trim() || null,
+        urgency,
+        status:                'pending',
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      logger.error('Failed to insert surgery recommendation', {
+        error: insertError.message,
+      });
+      return res.status(500).json({ message: 'Failed to save recommendation' });
+    }
+
+    logger.info('Surgery recommendation saved', {
+      recommendation_id: recommendation.id,
+      case_id:           caseId,
+      surgeon_id,
+      urgency,
+    });
+
+    return res.status(201).json({
+      message:        'Surgery recommendation submitted',
+      recommendation,
+    });
+
+  } catch (error) {
+    logger.error('Error submitting surgery recommendation', { error: error.message });
+    return res.status(500).json({ message: 'Failed to submit recommendation' });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/cases/:caseId/recommendation
+// Returns the surgery recommendation for a case, if one exists.
+// Joins with surgeons table to include the recommending surgeon's details.
+//
+// Called by: Hospital Web App — CaseDetail page (re-consult cases)
+//
+// IMPORTANT: Must be defined BEFORE GET /:id so Express doesn't match
+// the literal "recommendation" as a UUID parameter.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:caseId/recommendation', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+
+    logger.info('Fetching recommendation for case', { case_id: caseId });
+
+    // Fetch the recommendation with surgeon details via Supabase join
+    const { data: recommendation, error } = await supabase
+      .from('surgery_recommendations')
+      .select(`
+        *,
+        surgeons (
+          id, name, specialty, experience_years, rating, city
+        )
+      `)
+      .eq('case_id', caseId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      logger.error('Failed to fetch recommendation', { error: error.message });
+      return res.status(500).json({ message: 'Failed to fetch recommendation' });
+    }
+
+    // Return null gracefully if no recommendation exists — this is not an error
+    logger.info('Recommendation fetched', {
+      case_id: caseId,
+      found:   !!recommendation,
+    });
+
+    return res.json({
+      recommendation: recommendation || null,
+    });
+
+  } catch (error) {
+    logger.error('Error fetching recommendation', { error: error.message });
+    return res.status(500).json({ message: 'Failed to fetch recommendation' });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/cases/:caseId/convert
+// Hospital confirms they want to convert a re-consult case into a full
+// surgery case. This:
+//   1. Sets the re-consult case status to 'converted'
+//   2. Sets the recommendation status to 'accepted'
+//
+// The frontend then handles opening a pre-filled NewRequest form with the
+// recommendation details and parent_case_id set to this case.
+//
+// Called by: Hospital Web App — CaseDetail page (re-consult flow)
+//
+// IMPORTANT: Must be defined BEFORE PATCH /:id so Express doesn't match
+// the literal "convert" as a UUID parameter.
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:caseId/convert', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { hospital_id } = req.body;
+
+    logger.info('Converting re-consult case to surgery', {
+      case_id:     caseId,
+      hospital_id,
+    });
+
+    // ── Validate hospital_id ─────────────────────────────────────────────
+    if (!hospital_id) {
+      return res.status(400).json({ message: 'hospital_id is required' });
+    }
+
+    // ── Verify case exists, belongs to this hospital, and is a re-consult
+    const { data: case_, error: caseError } = await supabase
+      .from('cases')
+      .select('id, hospital_id, request_type, status')
+      .eq('id', caseId)
+      .single();
+
+    if (caseError || !case_) {
+      logger.warn('Case not found for conversion', { case_id: caseId });
+      return res.status(404).json({ message: 'Case not found' });
+    }
+
+    if (case_.hospital_id !== hospital_id) {
+      logger.warn('Convert rejected — hospital mismatch', {
+        case_id:     caseId,
+        expected:    case_.hospital_id,
+        received:    hospital_id,
+      });
+      return res.status(403).json({ message: 'This case does not belong to your hospital' });
+    }
+
+    if (case_.request_type !== 'reconsult') {
+      logger.warn('Convert rejected — case is not a re-consult', {
+        case_id:      caseId,
+        request_type: case_.request_type,
+      });
+      return res.status(400).json({ message: 'Only re-consult cases can be converted' });
+    }
+
+    if (case_.status === 'converted') {
+      logger.warn('Case already converted', { case_id: caseId });
+      return res.status(400).json({ message: 'This case has already been converted' });
+    }
+
+    // ── Update re-consult case status to 'converted' ─────────────────────
+    const { error: updateError } = await supabase
+      .from('cases')
+      .update({ status: 'converted' })
+      .eq('id', caseId);
+
+    if (updateError) {
+      logger.error('Failed to update case status to converted', {
+        error: updateError.message,
+      });
+      return res.status(500).json({ message: 'Failed to convert case' });
+    }
+
+    // ── Mark the recommendation as 'accepted' ────────────────────────────
+    // There may be multiple recommendations (edge case) — accept the most recent one
+    const { error: recError } = await supabase
+      .from('surgery_recommendations')
+      .update({ status: 'accepted' })
+      .eq('case_id', caseId)
+      .eq('status', 'pending');
+
+    if (recError) {
+      logger.error('Failed to update recommendation status', {
+        error: recError.message,
+      });
+      // Non-fatal — the case is already converted, log and continue
+    }
+
+    logger.info('Re-consult case converted successfully', { case_id: caseId });
+
+    return res.json({
+      message: 'Re-consult case converted to surgery',
+      case_id: caseId,
+    });
+
+  } catch (error) {
+    logger.error('Error converting re-consult case', { error: error.message });
+    return res.status(500).json({ message: 'Failed to convert case' });
   }
 });
 
@@ -397,9 +744,15 @@ router.get('/:id', async (req, res) => {
       priority_list_count: priorityList?.length || 0,
     });
 
+    // ADDED (Migration 001): Include skip_shortlist flag so frontend knows
+    // whether this case type should bypass the shortlist page.
+    // request_type and fee are already in case_ from the SELECT * above.
+    const skip_shortlist = computeSkipShortlist(case_.request_type, case_.surgery_date);
+
     return res.json({
-      case:          case_,
-      priority_list: priorityList || [],
+      case:           case_,
+      priority_list:  priorityList || [],
+      skip_shortlist, // NEW — mirrors the logic from POST /api/cases
     });
 
   } catch (error) {
@@ -433,22 +786,24 @@ router.patch('/:id/priority', async (req, res) => {
       });
     }
 
-    if (priority_list.length > 5) {
-      return res.status(400).json({
-        message: 'Priority list cannot have more than 5 surgeons'
-      });
-    }
-
-    // Verify case exists
+    // Verify case exists and check request_type
     const { data: case_, error: caseError } = await supabase
       .from('cases')
-      .select('id, status')
+      .select('id, status, request_type')
       .eq('id', id)
       .single();
 
     if (caseError || !case_) {
       return res.status(404).json({ message: 'Case not found' });
     }
+
+    const isEmergency = case_.request_type === 'emergency';
+
+    // Delete any existing priority list rows for this case (allows re-submission)
+    await supabase
+      .from('case_priority_list')
+      .delete()
+      .eq('case_id', id);
 
     // Insert priority list rows
     const priorityRows = priority_list.map((surgeon_id, index) => ({
@@ -469,7 +824,7 @@ router.patch('/:id/priority', async (req, res) => {
       return res.status(500).json({ message: 'Failed to save priority list' });
     }
 
-    // Update case status to 'cascading'
+    // Update case status
     const { error: updateError } = await supabase
       .from('cases')
       .update({ status: 'cascading' })
@@ -479,13 +834,20 @@ router.patch('/:id/priority', async (req, res) => {
       logger.error('Failed to update case status', { error: updateError.message });
     }
 
-    // Trigger cascade — notify the first surgeon
-    await triggerCascade(id);
-
-    logger.info('Priority list saved and cascade triggered', { case_id: id });
+    if (isEmergency) {
+      // Emergency: broadcast to ALL surgeons simultaneously — no cascade
+      await broadcastEmergency(id);
+      logger.info('Emergency broadcast sent to all surgeons', { case_id: id });
+    } else {
+      // Normal flow: cascade through surgeons one-by-one
+      await triggerCascade(id);
+      logger.info('Priority list saved and cascade triggered', { case_id: id });
+    }
 
     return res.json({
-      message: 'Priority list saved. Requests sent to surgeons.',
+      message: isEmergency
+        ? 'Emergency request sent to all available surgeons.'
+        : 'Priority list saved. Requests sent to surgeons.',
       case_id: id,
     });
 
@@ -520,8 +882,10 @@ router.patch('/:id', async (req, res) => {
       patient_name,
       patient_age,
       patient_gender,
-      fee_min,
-      fee_max,
+      fee,            // NEW (Migration 001): flat fee in paise
+      request_type,   // NEW (Migration 001): case classification
+      fee_min,        // DEPRECATED: backward compat, nullable
+      fee_max,        // DEPRECATED: backward compat, nullable
       notes,
       documents,   // JSONB array — uploaded file metadata
       status,      // allow status transitions (e.g. draft → active)
@@ -538,12 +902,21 @@ router.patch('/:id', async (req, res) => {
     if (patient_name       !== undefined) updates.patient_name       = patient_name;
     if (patient_age        !== undefined) updates.patient_age        = patient_age;
     if (patient_gender     !== undefined) updates.patient_gender     = patient_gender;
+    if (fee                !== undefined) updates.fee                = fee;            // NEW
+    if (request_type       !== undefined) updates.request_type       = request_type;   // NEW
     if (fee_min            !== undefined) updates.fee_min            = fee_min;
     if (fee_max            !== undefined) updates.fee_max            = fee_max;
     if (notes              !== undefined) updates.notes              = notes;
     if (documents          !== undefined) updates.documents          = documents;
     if (status             !== undefined) updates.status             = status;
     updates.updated_at = new Date().toISOString();
+
+    // Validate request_type if it's being updated
+    if (request_type !== undefined && !VALID_REQUEST_TYPES.includes(request_type)) {
+      return res.status(400).json({
+        message: `Invalid request_type: ${request_type}. Must be one of: ${VALID_REQUEST_TYPES.join(', ')}`
+      });
+    }
 
     const { data: case_, error } = await supabase
       .from('cases')
@@ -655,6 +1028,9 @@ router.get('/:caseId/surgeon-view', async (req, res) => {
 
     logger.info('Surgeon view fetched', { case_id: caseId });
 
+    // UPDATED (Migration 001): The spread (...case_) already includes the
+    // new request_type and fee columns from SELECT *. No extra work needed —
+    // the surgeon mobile app will receive them automatically.
     return res.json({
       case: {
         ...case_,
@@ -714,6 +1090,15 @@ router.patch('/:caseId/accept', async (req, res) => {
       return res.status(500).json({ message: 'Failed to confirm case' });
     }
 
+    // Cancel all other notified/pending surgeons for this case
+    // (important for emergency broadcasts where all surgeons were notified at once)
+    await supabase
+      .from('case_priority_list')
+      .update({ status: 'cancelled' })
+      .eq('case_id', caseId)
+      .neq('surgeon_id', surgeon_id)
+      .in('status', ['notified', 'pending']);
+
     logger.info('Case accepted successfully', { case_id: caseId, surgeon_id });
     return res.json({ message: 'Case accepted successfully' });
 
@@ -756,10 +1141,37 @@ router.patch('/:caseId/decline', async (req, res) => {
       return res.status(500).json({ message: 'Failed to decline case' });
     }
 
-    // Trigger cascade — notify next surgeon in list
-    await triggerCascade(caseId);
+    // Check if this is an emergency case
+    const { data: caseData } = await supabase
+      .from('cases')
+      .select('request_type')
+      .eq('id', caseId)
+      .single();
 
-    logger.info('Case declined, cascade triggered', { case_id: caseId });
+    if (caseData?.request_type === 'emergency') {
+      // Emergency: all surgeons already notified — check if any are still notified
+      const { data: remaining } = await supabase
+        .from('case_priority_list')
+        .select('id')
+        .eq('case_id', caseId)
+        .eq('status', 'notified');
+
+      if (!remaining || remaining.length === 0) {
+        // All surgeons declined or expired — mark unfilled
+        await supabase.from('cases').update({ status: 'unfilled' }).eq('id', caseId);
+        logger.info('Emergency: all surgeons declined, case unfilled', { case_id: caseId });
+      } else {
+        logger.info('Emergency: surgeon declined, others still pending', {
+          case_id: caseId,
+          remaining: remaining.length,
+        });
+      }
+    } else {
+      // Normal flow: cascade to next surgeon
+      await triggerCascade(caseId);
+      logger.info('Case declined, cascade triggered', { case_id: caseId });
+    }
+
     return res.json({ message: 'Case declined' });
 
   } catch (error) {
@@ -767,6 +1179,94 @@ router.patch('/:caseId/decline', async (req, res) => {
     return res.status(500).json({ message: 'Failed to decline case' });
   }
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BROADCAST EMERGENCY
+// Notifies ALL surgeons at once — no cascade. Used for emergency requests.
+// Every surgeon in the priority list gets notified simultaneously.
+// First surgeon to accept wins; the rest are ignored.
+// ─────────────────────────────────────────────────────────────────────────────
+async function broadcastEmergency(caseId) {
+  logger.info('Broadcasting emergency to all surgeons', { case_id: caseId });
+
+  try {
+    // Fetch all pending rows for this case
+    const { data: rows, error } = await supabase
+      .from('case_priority_list')
+      .select('*, surgeons(name, phone, email)')
+      .eq('case_id', caseId)
+      .eq('status', 'pending')
+      .order('priority_order', { ascending: true });
+
+    if (error || !rows || rows.length === 0) {
+      logger.warn('No pending surgeons for emergency broadcast', { case_id: caseId });
+      await supabase
+        .from('cases')
+        .update({ status: 'unfilled' })
+        .eq('id', caseId);
+      return;
+    }
+
+    // Set expires_at to 2 hours from now for all surgeons
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 2);
+
+    // Mark ALL surgeons as 'notified' at once
+    const ids = rows.map(r => r.id);
+    const { error: updateError } = await supabase
+      .from('case_priority_list')
+      .update({
+        status:      'notified',
+        notified_at: new Date().toISOString(),
+        expires_at:  expiresAt.toISOString(),
+      })
+      .in('id', ids);
+
+    if (updateError) {
+      logger.error('Failed to update emergency broadcast rows', { error: updateError.message });
+      return;
+    }
+
+    // Fetch case details for notifications
+    const { data: caseData } = await supabase
+      .from('cases')
+      .select('procedure, surgery_date, surgery_time, fee, fee_max')
+      .eq('id', caseId)
+      .single();
+
+    // Send notifications to ALL surgeons simultaneously
+    const notifyPromises = rows
+      .filter(row => row.surgeons?.phone)
+      .map(row => {
+        const feeForNotification = caseData?.fee || caseData?.fee_max;
+        return notifyNewCase({
+          surgeonName:  row.surgeons.name,
+          surgeonPhone: row.surgeons.phone,
+          procedure:    caseData?.procedure,
+          surgeryDate:  caseData?.surgery_date,
+          surgeryTime:  caseData?.surgery_time,
+          feeMax:       feeForNotification,
+          expiresAt:    expiresAt.toISOString(),
+        }).catch(err => {
+          logger.error('Failed to notify surgeon in emergency broadcast', {
+            surgeon_name: row.surgeons.name,
+            error: err.message,
+          });
+        });
+      });
+
+    await Promise.all(notifyPromises);
+
+    logger.info('Emergency broadcast complete', {
+      case_id: caseId,
+      surgeons_notified: rows.length,
+    });
+
+  } catch (error) {
+    logger.error('Error in emergency broadcast', { error: error.message });
+  }
+}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -826,22 +1326,26 @@ async function triggerCascade(caseId) {
     // First surgeon gets "new case" message; subsequent get "case passed"
     const isFirstSurgeon = nextRow.priority_order === 1;
 
+    // UPDATED (Migration 001): Fetch fee (flat fee) alongside fee_max for
+    // backward compat. Notifications use whichever is available.
     const caseDetails = await supabase
       .from('cases')
-      .select('procedure, surgery_date, surgery_time, fee_max')
+      .select('procedure, surgery_date, surgery_time, fee, fee_max')
       .eq('id', caseId)
       .single();
 
     if (caseDetails.data && nextRow.surgeons?.phone) {
       console.log('=== Firing notification to:', nextRow.surgeons.phone);
       const notifyFn = isFirstSurgeon ? notifyNewCase : notifyCasePassed;
+      // Use the new flat fee if available, fall back to fee_max for old cases
+      const feeForNotification = caseDetails.data.fee || caseDetails.data.fee_max;
       await notifyFn({
         surgeonName:  nextRow.surgeons.name,
         surgeonPhone: nextRow.surgeons.phone,
         procedure:    caseDetails.data.procedure,
         surgeryDate:  caseDetails.data.surgery_date,
         surgeryTime:  caseDetails.data.surgery_time,
-        feeMax:       caseDetails.data.fee_max,
+        feeMax:       feeForNotification,
         expiresAt:    expiresAt.toISOString(),
       });
     }
@@ -853,16 +1357,50 @@ async function triggerCascade(caseId) {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HAVERSINE DISTANCE (km)
+// Calculates the great-circle distance between two lat/lng points.
+// Used by matchSurgeons to determine surgeon proximity to the hospital.
+// Returns distance in kilometres.
+// ─────────────────────────────────────────────────────────────────────────────
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371; // Earth's radius in km
+  const toRad = (deg) => (deg * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MATCHING ALGORITHM
 // Finds the best available surgeons for a given case.
-// Returns up to 7 surgeons ordered by match score.
+// Returns up to `limit` surgeons ordered by match score.
 //
-// Scoring:
-//   +50  — same city as hospital
+// UPDATED (Migration 005): City-based matching replaced with distance-based
+// matching using haversine formula and hospital/surgeon lat/lng coordinates.
+//
+// Scoring breakdown:
+//   +0–50 — proximity score (closer to hospital = higher)
+//           Formula: max(0, 50 - (distance_km * 2))
+//           Surgeons with no preferred location get a neutral +25
 //   +0–50 — surgeon rating (rating × 10)
 //   +0–20 — total cases done (experience on platform)
+//
+// Distance filtering:
+//   - Surgeons WITH preferred_lat/lng: excluded if distance > travel_radius_km
+//     (defaults to 10km if travel_radius_km not set on surgeon record)
+//   - Surgeons WITHOUT preferred_lat/lng: always included (no location to filter on)
+//   - If hospital has no lat/lng: all surgeons included, neutral proximity score
 // ─────────────────────────────────────────────────────────────────────────────
-async function matchSurgeons({ specialty_required, surgery_date, surgery_time, city, fee_min, fee_max }) {
+async function matchSurgeons({ specialty_required, surgery_date, surgery_time, hospital_lat, hospital_lng, limit = 7 }) {
   try {
     logger.info('Matching: querying verified surgeons', { specialty_required });
 
@@ -919,26 +1457,69 @@ async function matchSurgeons({ specialty_required, surgery_date, surgery_time, c
       count: availableSurgeons.length,
     });
 
-    // Score and sort
-    const scoredSurgeons = availableSurgeons.map(surgeon => {
+    // ── Distance filtering + scoring ─────────────────────────────────────
+    // Whether we can do distance filtering depends on the hospital having lat/lng.
+    const hospitalHasLocation = hospital_lat != null && hospital_lng != null;
+
+    const scoredSurgeons = [];
+
+    for (const surgeon of availableSurgeons) {
+      const surgeonHasLocation = surgeon.preferred_lat != null && surgeon.preferred_lng != null;
+
+      let proximityScore = 25;  // neutral default for surgeons with no location
+      let distanceKm     = null;
+
+      if (hospitalHasLocation && surgeonHasLocation) {
+        // Both have coordinates — calculate actual distance
+        distanceKm = haversineKm(
+          surgeon.preferred_lat, surgeon.preferred_lng,
+          hospital_lat, hospital_lng
+        );
+
+        // Respect travel radius — default to 10km if not set on the surgeon
+        const travelRadius = surgeon.travel_radius_km || 10;
+
+        if (distanceKm > travelRadius) {
+          // Surgeon is outside their travel radius — exclude
+          logger.debug('Surgeon excluded: outside travel radius', {
+            surgeon_name: surgeon.name,
+            distance_km:  Math.round(distanceKm * 10) / 10,
+            travel_radius: travelRadius,
+          });
+          continue;
+        }
+
+        // Proximity score: closer = higher. 0km → 50pts, 25km → 0pts
+        proximityScore = Math.max(0, 50 - (distanceKm * 2));
+      }
+      // If surgeon has no location OR hospital has no location → include with
+      // neutral proximity score (25). No distance filtering applied.
+
+      // Build total score
       let score = 0;
 
-      // Same city as hospital = big boost
-      if (surgeon.city && city && surgeon.city.toLowerCase() === city.toLowerCase()) {
-        score += 50;
-      }
+      // Proximity (max 50 points) — replaces old city-based +50
+      score += proximityScore;
 
-      // Rating (max 50 points)
+      // Rating (max 50 points) — unchanged
       score += (surgeon.rating || 0) * 10;
 
-      // Platform experience (max 20 points)
+      // Platform experience (max 20 points) — unchanged
       score += Math.min((surgeon.total_cases || 0) / 10, 20);
 
-      return { ...surgeon, match_score: score };
+      scoredSurgeons.push({
+        ...surgeon,
+        match_score: score,
+        distance_km: distanceKm != null ? Math.round(distanceKm * 10) / 10 : null,
+      });
+    }
+
+    logger.info('Matching: surgeons after distance filtering', {
+      count: scoredSurgeons.length,
     });
 
     scoredSurgeons.sort((a, b) => b.match_score - a.match_score);
-    const topSurgeons = scoredSurgeons.slice(0, 7);
+    const topSurgeons = limit ? scoredSurgeons.slice(0, limit) : scoredSurgeons;
 
     logger.info('Matching complete', {
       total_matched: topSurgeons.length,

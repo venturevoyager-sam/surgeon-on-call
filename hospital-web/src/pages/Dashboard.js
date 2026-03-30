@@ -27,20 +27,25 @@ export default function Dashboard() {
   const [activeTab,   setActiveTab]   = useState('active');
   const [loading,     setLoading]     = useState(true);
 
+  // NEW (Migration 001): Controls the request type selector dropdown
+  const [showRequestMenu, setShowRequestMenu] = useState(false);
+
   const navigate = useNavigate();
 
   // ── LOAD ───────────────────────────────────────────────────────────────────
+  // Uses hospital_id from localStorage (set by Login.js after custom auth login)
   useEffect(() => {
     const load = async () => {
-      // DEV MODE — hardcoded email
-      const devEmail = 'venturevoyager.sam@gmail.com';
-      setUser({ email: devEmail });
+      const hospitalId = localStorage.getItem('hospital_id');
+      if (!hospitalId) { navigate('/'); return; }
 
-      // Get hospital record
+      setUser({ name: localStorage.getItem('hospital_name') });
+
+      // Get hospital record by ID (not email — no more devEmail hardcoding)
       const { data: hospitalData } = await supabase
         .from('hospitals')
         .select('*')
-        .eq('contact_email', devEmail)
+        .eq('id', hospitalId)
         .single();
 
       if (hospitalData) {
@@ -54,21 +59,62 @@ export default function Dashboard() {
 
   // ── FETCH CASES ────────────────────────────────────────────────────────────
   const fetchCases = async (hospitalId) => {
+    // Join case_priority_list to get expires_at for the currently notified surgeon.
+    // This lets us sort active cases by urgency (soonest expiry first).
     const { data: cases } = await supabase
       .from('cases')
-      .select('*')
+      .select('*, case_priority_list(expires_at, status)')
       .eq('hospital_id', hospitalId)
       .order('created_at', { ascending: false });
 
     if (!cases) return;
 
     // Draft cases (from Find a Surgeon flow) go into active tab
-    setActiveCases(cases.filter(c =>
+    const active = cases.filter(c =>
       ['draft', 'active', 'cascading', 'confirmed', 'in_progress'].includes(c.status)
-    ));
+    );
+
+    // ── Sort active cases by urgency ─────────────────────────────────────
+    // 1. Emergency cases always first (regardless of expiry)
+    // 2. Non-emergency cases sorted by soonest expires_at ascending
+    // 3. Cases with no active expiry (draft, shortlist stage) sink to bottom
+    active.sort((a, b) => {
+      const aEmergency = a.request_type === 'emergency';
+      const bEmergency = b.request_type === 'emergency';
+
+      // Emergency cases always come first
+      if (aEmergency && !bEmergency) return -1;
+      if (!aEmergency && bEmergency) return 1;
+
+      // Within the same group, sort by the active (notified) row's expires_at.
+      // Find the currently notified row's expires_at from the joined priority list.
+      const aExpiry = getActiveExpiry(a.case_priority_list);
+      const bExpiry = getActiveExpiry(b.case_priority_list);
+
+      // Cases with no active expiry sink to the bottom of their group
+      if (aExpiry && !bExpiry) return -1;
+      if (!aExpiry && bExpiry) return 1;
+      if (!aExpiry && !bExpiry) return 0;
+
+      // Soonest expiry first (most urgent at top)
+      return new Date(aExpiry) - new Date(bExpiry);
+    });
+
+    setActiveCases(active);
     setPastCases(cases.filter(c =>
       ['completed', 'cancelled', 'unfilled'].includes(c.status)
     ));
+  };
+
+  /**
+   * Extract the expires_at timestamp from the currently active (notified) priority
+   * list row. Returns null if no surgeon is currently notified (e.g. draft cases
+   * or cases where the cascade hasn't started yet).
+   */
+  const getActiveExpiry = (priorityList) => {
+    if (!priorityList || !Array.isArray(priorityList)) return null;
+    const notifiedRow = priorityList.find(row => row.status === 'notified');
+    return notifiedRow?.expires_at || null;
   };
 
   // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -105,8 +151,11 @@ export default function Dashboard() {
     return '₹' + (p / 100).toLocaleString('en-IN');
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  // Logout — clear localStorage and redirect to login
+  // (Replaced supabase.auth.signOut — hospital auth is now custom)
+  const handleLogout = () => {
+    localStorage.removeItem('hospital_id');
+    localStorage.removeItem('hospital_name');
     navigate('/');
   };
 
@@ -166,13 +215,132 @@ export default function Dashboard() {
             🔍 Find a Surgeon
           </button>
 
-          {/* New Request — standard form flow */}
-          <button
-            onClick={() => navigate('/new-request')}
-            className="btn-primary px-4 py-2 text-sm"
-          >
-            + New Request
-          </button>
+          {/* NEW (Migration 001): Request type selector dropdown.
+              Replaces the single "New Request" button with a menu that lets
+              the SPOC choose: Emergency, OPD, Re-consult, or Elective Surgery.
+              Emergency is styled red/urgent to stand out. */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowRequestMenu(prev => !prev)}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              + New Request ▾
+            </button>
+
+            {/* Dropdown menu — appears below the button */}
+            {showRequestMenu && (
+              <>
+                {/* Invisible backdrop to close menu on outside click */}
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                  onClick={() => setShowRequestMenu(false)}
+                />
+
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '6px',
+                    width: '240px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #E8E0D8',
+                    boxShadow: '0 8px 24px rgba(68, 44, 20, 0.15)',
+                    zIndex: 50,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Emergency — visually distinct with red styling */}
+                  <button
+                    onClick={() => { setShowRequestMenu(false); navigate('/emergency-request'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      width: '100%', padding: '12px 16px',
+                      fontSize: '13px', fontWeight: '600',
+                      color: '#dc2626',
+                      backgroundColor: '#FEF2F2',
+                      border: 'none', cursor: 'pointer',
+                      fontFamily: '"DM Sans", sans-serif',
+                      textAlign: 'left',
+                      borderBottom: '1px solid #FECACA',
+                      transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FEE2E2'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FEF2F2'}
+                  >
+                    <span style={{ fontSize: '16px' }}>🚨</span>
+                    Emergency
+                  </button>
+
+                  {/* OPD */}
+                  <button
+                    onClick={() => { setShowRequestMenu(false); navigate('/opd-request'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      width: '100%', padding: '12px 16px',
+                      fontSize: '13px', fontWeight: '500',
+                      color: '#444444',
+                      backgroundColor: '#ffffff',
+                      border: 'none', cursor: 'pointer',
+                      fontFamily: '"DM Sans", sans-serif',
+                      textAlign: 'left',
+                      borderBottom: '1px solid #E8E0D8',
+                      transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FDF8F5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                  >
+                    <span style={{ fontSize: '16px' }}>🏥</span>
+                    OPD Consultation
+                  </button>
+
+                  {/* Re-consult */}
+                  <button
+                    onClick={() => { setShowRequestMenu(false); navigate('/reconsult-request'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      width: '100%', padding: '12px 16px',
+                      fontSize: '13px', fontWeight: '500',
+                      color: '#444444',
+                      backgroundColor: '#ffffff',
+                      border: 'none', cursor: 'pointer',
+                      fontFamily: '"DM Sans", sans-serif',
+                      textAlign: 'left',
+                      borderBottom: '1px solid #E8E0D8',
+                      transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FDF8F5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                  >
+                    <span style={{ fontSize: '16px' }}>🔄</span>
+                    Re-consultation
+                  </button>
+
+                  {/* Elective Surgery (standard — goes to existing NewRequest.js) */}
+                  <button
+                    onClick={() => { setShowRequestMenu(false); navigate('/new-request'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      width: '100%', padding: '12px 16px',
+                      fontSize: '13px', fontWeight: '500',
+                      color: '#444444',
+                      backgroundColor: '#ffffff',
+                      border: 'none', cursor: 'pointer',
+                      fontFamily: '"DM Sans", sans-serif',
+                      textAlign: 'left',
+                      transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FDF8F5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                  >
+                    <span style={{ fontSize: '16px' }}>🔪</span>
+                    Elective Surgery
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* 🔔 Notification bell — placeholder, not wired up yet */}
           <button
@@ -305,7 +473,7 @@ export default function Dashboard() {
                   backgroundColor: '#FDF8F5',
                   borderBottom: '1px solid #E8E0D8',
                 }}>
-                  {['Case ID', 'Procedure', 'Surgery Date', 'Fee Range', 'Status', 'Action'].map(h => (
+                  {['Case ID', 'Procedure', 'Surgery Date', 'Fee', 'Status', 'Action'].map(h => (
                     <th key={h} style={{
                       display: 'table-cell',
                       textAlign: 'left', padding: '12px 20px',
@@ -351,9 +519,9 @@ export default function Dashboard() {
                       <div style={{ fontSize: '12px', color: '#8B8B8B', marginTop: '2px' }}>{c.surgery_time}</div>
                     </td>
 
-                    {/* Fee */}
+                    {/* Fee — show flat fee if available, fall back to range for old cases */}
                     <td style={{ display: 'table-cell', padding: '14px 20px', fontSize: '13px', color: '#8B8B8B' }}>
-                      {c.fee_min ? `${formatFee(c.fee_min)} – ${formatFee(c.fee_max)}` : '—'}
+                      {c.fee ? formatFee(c.fee) : c.fee_min ? `${formatFee(c.fee_min)} – ${formatFee(c.fee_max)}` : '—'}
                     </td>
 
                     {/* Status */}

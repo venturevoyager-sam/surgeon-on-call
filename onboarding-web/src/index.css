@@ -1,0 +1,12 @@
+/* ── TAILWIND CSS ENTRY POINT ─────────────────────────────────────────────────
+   Surgeon on Call — Onboarding Web
+   Vaidhya Healthcare Pvt Ltd
+
+   Import DM Sans from Google Fonts for brand consistency across all apps.
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

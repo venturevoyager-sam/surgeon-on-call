@@ -6,11 +6,20 @@
  *
  * Features:
  * - Case summary (procedure, date, time, patient)
+ * - Request type badge — Emergency (red), OPD (blue), Re-consult (purple), Elective (grey)
  * - Priority cascade tracker
  * - Live countdown timer
+ * - Emergency auto-poll (10s) with pulsing live indicator
+ * - Single fee display (paise → ₹) replacing fee_min/fee_max
  * - Confirmed surgeon card
  * - Edit case modal (all fields, all statuses)
  * - Delete case with confirmation
+ *
+ * UPDATED (Migration 001):
+ *   - Added request_type badge near case title
+ *   - Emergency cases poll every 10s (others keep 30s)
+ *   - Fee display changed from range to single flat fee
+ *   - Edit modal updated from fee_min/fee_max to single fee
  */
 
 import React, { useState, useEffect } from 'react';
@@ -19,24 +28,9 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-// Specialty options — must match surgeon specialties
-const SPECIALTY_OPTIONS = [
-  'General Surgery',
-  'Laparoscopic Surgery',
-  'Orthopedic Surgery',
-  'Cardiac Surgery',
-  'Neurosurgery',
-  'Plastic Surgery',
-  'Urological Surgery',
-  'Vascular Surgery',
-  'Thoracic Surgery',
-  'Pediatric Surgery',
-  'Gynecological Surgery',
-  'ENT Surgery',
-  'Ophthalmology',
-  'Oncological Surgery',
-  'Transplant Surgery',
-];
+// SPECIALTY_OPTIONS: removed — was hardcoded with different naming than other pages,
+// causing a mismatch bug. Now fetched from GET /api/specialties (see useEffect below).
+// This ensures all pages use the same canonical specialty names from the database.
 
 export default function CaseDetail() {
   const navigate = useNavigate();
@@ -59,6 +53,15 @@ export default function CaseDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting]                   = useState(false);
 
+  // Specialties fetched from API — drives the specialty dropdown in edit modal
+  const [specialties, setSpecialties] = useState([]);
+
+  // Surgery recommendation state (Migration 004)
+  // For re-consult cases: fetched recommendation from the confirmed surgeon
+  const [recommendation, setRecommendation] = useState(null);
+  const [recLoading, setRecLoading]         = useState(false);
+  const [converting, setConverting]         = useState(false);
+
   // ── FETCH CASE ─────────────────────────────────────────────────────────────
   const fetchCase = async () => {
     try {
@@ -73,11 +76,49 @@ export default function CaseDetail() {
     }
   };
 
+  // UPDATED (Migration 001): Emergency cases poll every 10s for faster
+  // cascade updates. All other request types keep the original 30s interval.
+  // The polling rate adapts when caseData.request_type changes (e.g. on first load).
   useEffect(() => {
     fetchCase();
-    const interval = setInterval(fetchCase, 30000);
-    return () => clearInterval(interval);
   }, [caseId]);
+
+  // ── FETCH SURGERY RECOMMENDATION (Migration 004) ─────────────────────────
+  // For re-consult cases, check if the confirmed surgeon has submitted a
+  // surgery recommendation. Fetched once after caseData loads.
+  useEffect(() => {
+    if (!caseData) return;
+    if (caseData.request_type !== 'reconsult') return;
+
+    const fetchRec = async () => {
+      setRecLoading(true);
+      try {
+        const res = await axios.get(`${API_URL}/api/cases/${caseId}/recommendation`);
+        setRecommendation(res.data.recommendation || null);
+      } catch (err) {
+        console.error('Failed to fetch recommendation:', err);
+      } finally {
+        setRecLoading(false);
+      }
+    };
+    fetchRec();
+  }, [caseData?.request_type, caseId]);
+
+  // Fetch specialties from API on mount — replaces hardcoded SPECIALTY_OPTIONS array.
+  // Fixes the naming mismatch bug where CaseDetail used different specialty names
+  // (e.g. "Orthopedic Surgery") than the rest of the app (e.g. "Orthopaedics").
+  useEffect(() => {
+    axios.get(`${API_URL}/api/specialties`)
+      .then(res => setSpecialties(res.data.specialties || []))
+      .catch(err => console.error('Failed to load specialties:', err));
+  }, []);
+
+  useEffect(() => {
+    const isEmergency = caseData?.request_type === 'emergency';
+    const pollMs = isEmergency ? 10000 : 30000;  // 10s for emergency, 30s for others
+    const interval = setInterval(fetchCase, pollMs);
+    return () => clearInterval(interval);
+  }, [caseId, caseData?.request_type]);
 
   // ── COUNTDOWN TIMER ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -101,6 +142,7 @@ export default function CaseDetail() {
   // ── OPEN EDIT MODAL ────────────────────────────────────────────────────────
   // Pre-fills the form with current case data
   const openEditModal = () => {
+    // UPDATED (Migration 001): Single fee field replaces fee_min/fee_max
     setEditForm({
       procedure:          caseData.procedure || '',
       specialty_required: caseData.specialty_required || '',
@@ -108,8 +150,7 @@ export default function CaseDetail() {
       surgery_time:       caseData.surgery_time?.slice(0, 5) || '',
       duration_hours:     caseData.duration_hours || '',
       ot_number:          caseData.ot_number || '',
-      fee_min:            caseData.fee_min ? caseData.fee_min / 100 : '',
-      fee_max:            caseData.fee_max ? caseData.fee_max / 100 : '',
+      fee:                caseData.fee ? caseData.fee / 100 : '',       // paise → ₹ for display
       patient_name:       caseData.patient_name || '',
       patient_age:        caseData.patient_age || '',
       patient_gender:     caseData.patient_gender || '',
@@ -124,11 +165,10 @@ export default function CaseDetail() {
     setSaving(true);
     setSaveError('');
     try {
+      // UPDATED (Migration 001): Send single fee in paise instead of fee_min/fee_max
       await axios.patch(`${API_URL}/api/cases/${caseId}`, {
         ...editForm,
-        // Convert fee back to paise
-        fee_min: Math.round(parseFloat(editForm.fee_min) * 100),
-        fee_max: Math.round(parseFloat(editForm.fee_max) * 100),
+        fee: Math.round(parseFloat(editForm.fee) * 100),  // ₹ → paise
         patient_age: parseInt(editForm.patient_age),
         duration_hours: parseFloat(editForm.duration_hours),
       });
@@ -152,6 +192,46 @@ export default function CaseDetail() {
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
+  };
+
+  // ── CONVERT RE-CONSULT TO SURGERY (Migration 004) ─────────────────────────
+  // Called when hospital clicks "Create Surgery Request" on the recommendation
+  // banner. Marks the re-consult as converted, then navigates to NewRequest
+  // with pre-filled data from the recommendation and original case.
+  const handleConvert = async () => {
+    setConverting(true);
+    try {
+      await axios.patch(`${API_URL}/api/cases/${caseId}/convert`, {
+        hospital_id: caseData.hospital_id,
+      });
+
+      // Navigate to NewRequest with pre-fill data via route state
+      navigate('/new-request', {
+        state: {
+          fromReconsult:        true,
+          parent_case_id:       caseId,
+          specialty_required:   caseData.specialty_required,
+          patient_name:         caseData.patient_name,
+          patient_age:          caseData.patient_age,
+          patient_gender:       caseData.patient_gender,
+          suggested_procedure:  recommendation.suggested_procedure,
+          recommendation_notes: recommendation.recommendation_notes,
+          recommending_surgeon_id: recommendation.surgeon_id,
+        },
+      });
+    } catch (err) {
+      console.error('Convert failed:', err);
+      alert(err.response?.data?.message || 'Failed to convert case. Please try again.');
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  // Dismiss a surgery recommendation — update its status locally.
+  // A full backend dismiss endpoint could be added later; for now we just
+  // hide the banner client-side so the SPOC can continue without it.
+  const handleDismissRecommendation = () => {
+    setRecommendation(null);
   };
 
   // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -192,6 +272,18 @@ export default function CaseDetail() {
     return caseData.surgery_date === new Date().toISOString().split('T')[0];
   };
 
+  // NEW (Migration 001): Request type badge styling
+  // Maps request_type to a colored badge shown near the case title
+  const requestTypeBadge = {
+    emergency: { cls: 'bg-red-100 text-red-600',    label: 'Emergency' },
+    opd:       { cls: 'bg-blue-100 text-blue-600',   label: 'OPD' },
+    reconsult: { cls: 'bg-purple-100 text-purple-600', label: 'Re-consult' },
+    elective:  { cls: 'bg-gray-100 text-gray-500',   label: 'Elective' },
+  };
+
+  // Whether this is an emergency case (used for live indicator and poll rate)
+  const isEmergency = caseData?.request_type === 'emergency';
+
   const confirmedSurgeon = priorityList.find(row => row.status === 'accepted')?.surgeons;
 
   // ── LOADING / ERROR ────────────────────────────────────────────────────────
@@ -216,6 +308,15 @@ export default function CaseDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
 
+      {/* NEW (Migration 001): Keyframe animation for the emergency live pulsing dot.
+          Defined inline via <style> to avoid modifying tailwind.config.js. */}
+      <style>{`
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.75); }
+        }
+      `}</style>
+
       {/* ── NAV ── */}
       <nav className="bg-blue-900 px-8 py-4 flex items-center justify-between">
         <h1 className="text-white font-bold text-xl">
@@ -238,6 +339,15 @@ export default function CaseDetail() {
               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge[caseData.status]}`}>
                 {statusLabel[caseData.status]}
               </span>
+
+              {/* NEW (Migration 001): Request type badge — Emergency, OPD, Re-consult, Elective */}
+              {caseData.request_type && (
+                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                  (requestTypeBadge[caseData.request_type] || requestTypeBadge.elective).cls
+                }`}>
+                  {(requestTypeBadge[caseData.request_type] || requestTypeBadge.elective).label}
+                </span>
+              )}
             </div>
             <p className="text-gray-500 text-sm">{caseData.procedure}</p>
           </div>
@@ -260,6 +370,19 @@ export default function CaseDetail() {
               🗑️ Delete
             </button>
 
+            {/* Request New Surgeons button — only for unfilled cases (all surgeons declined/expired) */}
+            {caseData.status === 'unfilled' && (
+              <button
+                onClick={() => navigate(`/cases/${caseId}/shortlist`)}
+                style={{ backgroundColor: '#E56717' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#CD4D00'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = '#E56717'}
+                className="text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+              >
+                Request New Surgeons
+              </button>
+            )}
+
             {/* GPS button — only on surgery day */}
             {isSurgeryDay() && caseData.status === 'confirmed' && (
               <button
@@ -271,6 +394,89 @@ export default function CaseDetail() {
             )}
           </div>
         </div>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            SURGERY RECOMMENDATION BANNER (Migration 004)
+            Shown when a confirmed surgeon on a re-consult case has submitted
+            a surgery recommendation. Displays procedure, urgency, notes, and
+            two actions: convert to surgery or dismiss.
+        ════════════════════════════════════════════════════════════════════ */}
+        {caseData.request_type === 'reconsult' && recLoading && (
+          <div className="mb-6 p-4 rounded-xl text-center" style={{ backgroundColor: '#FDF8F5', border: '1px solid #E8E0D8' }}>
+            <p style={{ color: '#8B8B8B' }} className="text-sm">Checking for surgery recommendations...</p>
+          </div>
+        )}
+
+        {caseData.request_type === 'reconsult' && !recLoading && recommendation && (
+          <div className="mb-6 rounded-xl overflow-hidden" style={{ border: '2px solid #E56717' }}>
+            {/* Banner header */}
+            <div className="px-5 py-3 flex items-center gap-2" style={{ backgroundColor: '#FFF7F0' }}>
+              <span className="text-lg">💡</span>
+              <span className="text-sm font-bold uppercase tracking-wide" style={{ color: '#E56717' }}>
+                Surgery Recommendation
+              </span>
+            </div>
+
+            {/* Banner body */}
+            <div className="px-5 py-4 bg-white">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  {/* Surgeon name */}
+                  {recommendation.surgeons && (
+                    <p className="text-xs mb-2" style={{ color: '#8B8B8B' }}>
+                      Recommended by <span className="font-semibold" style={{ color: '#444444' }}>
+                        {recommendation.surgeons.name}
+                      </span>
+                    </p>
+                  )}
+
+                  {/* Suggested procedure */}
+                  <p className="font-bold text-lg" style={{ color: '#444444' }}>
+                    {recommendation.suggested_procedure}
+                  </p>
+
+                  {/* Urgency badge */}
+                  <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
+                    ${recommendation.urgency === 'urgent'
+                      ? 'bg-red-100 text-red-600'
+                      : 'bg-gray-100 text-gray-500'
+                    }`}>
+                    {recommendation.urgency === 'urgent' ? 'Urgent' : 'Elective'}
+                  </span>
+
+                  {/* Recommendation notes */}
+                  {recommendation.recommendation_notes && (
+                    <p className="mt-3 text-sm leading-relaxed" style={{ color: '#444444' }}>
+                      {recommendation.recommendation_notes}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-3 mt-4 pt-4" style={{ borderTop: '1px solid #E8E0D8' }}>
+                <button
+                  onClick={handleConvert}
+                  disabled={converting}
+                  className="flex-1 text-white font-semibold py-3 rounded-lg text-sm transition disabled:opacity-50"
+                  style={{ backgroundColor: '#E56717' }}
+                  onMouseEnter={e => { if (!converting) e.currentTarget.style.backgroundColor = '#CD4D00'; }}
+                  onMouseLeave={e => { if (!converting) e.currentTarget.style.backgroundColor = '#E56717'; }}
+                >
+                  {converting ? 'Converting...' : 'Create Surgery Request'}
+                </button>
+                <button
+                  onClick={handleDismissRecommendation}
+                  disabled={converting}
+                  className="px-6 py-3 rounded-lg text-sm font-semibold transition"
+                  style={{ color: '#8B8B8B', border: '1px solid #E8E0D8' }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-6">
 
@@ -287,7 +493,14 @@ export default function CaseDetail() {
                 <Field label="Time"       value={caseData.surgery_time} />
                 <Field label="Duration"   value={`${caseData.duration_hours} hrs`} />
                 <Field label="OT Number"  value={`OT ${caseData.ot_number}`} />
-                <Field label="Fee Range"  value={`${formatFee(caseData.fee_min)} – ${formatFee(caseData.fee_max)}`} />
+                {/* UPDATED (Migration 001): Single fee display, with fallback to range for old cases */}
+                <Field label="Fee" value={
+                  caseData.fee
+                    ? formatFee(caseData.fee)
+                    : caseData.fee_min
+                      ? `${formatFee(caseData.fee_min)} – ${formatFee(caseData.fee_max)}`
+                      : '—'
+                } />
               </div>
             </div>
 
@@ -317,7 +530,24 @@ export default function CaseDetail() {
           <div className="col-span-2">
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Surgeon Cascade</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Surgeon Cascade</h3>
+
+                  {/* NEW (Migration 001): Pulsing live indicator for emergency cases.
+                      Shows when auto-polling is active (10s interval).
+                      CSS animation is inline to avoid needing a Tailwind keyframe config. */}
+                  {isEmergency && (
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 border border-red-200">
+                      <span
+                        className="inline-block w-2 h-2 rounded-full bg-red-500"
+                        style={{
+                          animation: 'pulse-dot 1.5s ease-in-out infinite',
+                        }}
+                      />
+                      <span className="text-xs font-semibold text-red-600">LIVE</span>
+                    </span>
+                  )}
+                </div>
                 {timeLeft && (
                   <div className="text-right">
                     <div className="text-xs text-gray-400">Waiting for response</div>
@@ -337,12 +567,46 @@ export default function CaseDetail() {
                       Select Surgeons →
                     </button>
                   )}
+                  {/* Edge case: unfilled with no priority rows (rows cleaned up) */}
+                  {caseData.status === 'unfilled' && (
+                    <button
+                      onClick={() => navigate(`/cases/${caseId}/shortlist`)}
+                      style={{ backgroundColor: '#E56717' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#CD4D00'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = '#E56717'}
+                      className="mt-4 text-white px-6 py-2 rounded-lg text-sm font-semibold transition"
+                    >
+                      Request New Surgeons →
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
                   {priorityList.map((row, index) => (
                     <CascadeRow key={row.id} row={row} index={index} />
                   ))}
+
+                  {/* Banner when all surgeons have declined/expired — case is unfilled */}
+                  {caseData.status === 'unfilled' && (
+                    <div className="mt-4 p-4 rounded-xl text-center"
+                      style={{ backgroundColor: '#FDF8F5', border: '1px solid #E8E0D8' }}>
+                      <p className="text-sm font-semibold mb-1" style={{ color: '#444444' }}>
+                        All surgeons have declined or expired
+                      </p>
+                      <p className="text-xs mb-3" style={{ color: '#8B8B8B' }}>
+                        You can request new surgeons to fill this case.
+                      </p>
+                      <button
+                        onClick={() => navigate(`/cases/${caseId}/shortlist`)}
+                        style={{ backgroundColor: '#E56717' }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#CD4D00'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = '#E56717'}
+                        className="text-white px-6 py-2 rounded-lg text-sm font-semibold transition"
+                      >
+                        Request New Surgeons →
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -392,9 +656,12 @@ export default function CaseDetail() {
                       onChange={e => setEditForm({...editForm, specialty_required: e.target.value})}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
                     >
-                      {SPECIALTY_OPTIONS.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
+                      {specialties.length === 0
+                        ? <option value="">Loading specialties...</option>
+                        : specialties.map(s => (
+                          <option key={s.id} value={s.name}>{s.name}</option>
+                        ))
+                      }
                     </select>
                   </div>
 
@@ -439,24 +706,17 @@ export default function CaseDetail() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Min Fee (₹)</label>
+                  {/* UPDATED (Migration 001): Single fee field replaces min/max */}
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Surgeon Fee (₹)</label>
                     <input
                       type="number"
-                      value={editForm.fee_min}
-                      onChange={e => setEditForm({...editForm, fee_min: e.target.value})}
+                      value={editForm.fee}
+                      onChange={e => setEditForm({...editForm, fee: e.target.value})}
+                      placeholder="e.g. 25000"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Max Fee (₹)</label>
-                    <input
-                      type="number"
-                      value={editForm.fee_max}
-                      onChange={e => setEditForm({...editForm, fee_max: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-                    />
+                    <p className="text-xs text-gray-400 mt-1">Total fee offered to surgeon. Platform deducts 5% commission.</p>
                   </div>
                 </div>
               </div>

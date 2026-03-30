@@ -21,24 +21,9 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-// All specialties available on the platform
-const SPECIALTIES = [
-  'All Specialties',
-  'General Surgery',
-  'Laparoscopic Surgery',
-  'Orthopaedics',
-  'Cardiothoracic Surgery',
-  'Neurosurgery',
-  'Urology',
-  'Gynaecology',
-  'Plastic Surgery',
-  'ENT Surgery',
-  'Ophthalmology',
-  'Vascular Surgery',
-  'Paediatric Surgery',
-  'Spine Surgery',
-  'Bariatric Surgery',
-];
+// SPECIALTIES: fetched from GET /api/specialties on mount (see useEffect below).
+// Removed hardcoded array — now driven by the specialties table in the database.
+// 'All Specialties' is prepended as a filter option in the dropdown rendering.
 
 export default function FindSurgeon() {
   const navigate = useNavigate();
@@ -48,6 +33,8 @@ export default function FindSurgeon() {
   const [surgeons,    setSurgeons]    = useState([]);
   const [filtered,    setFiltered]    = useState([]);
   const [loading,     setLoading]     = useState(true);
+  // Specialties fetched from API — drives the specialty filter dropdown
+  const [specialties, setSpecialties] = useState([]);
   const [booking,     setBooking]     = useState(null); // surgeon ID being booked
 
   // Filters
@@ -58,12 +45,12 @@ export default function FindSurgeon() {
   // ── LOAD HOSPITAL + SURGEONS ───────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
-      // DEV MODE
-      const devEmail = 'venturevoyager.sam@gmail.com';
+      // Uses hospital_id from localStorage (set by Login.js after custom auth login)
+      const hospitalId = localStorage.getItem('hospital_id');
       const { data: hosp } = await supabase
         .from('hospitals')
         .select('*')
-        .eq('contact_email', devEmail)
+        .eq('id', hospitalId)
         .single();
       setHospital(hosp);
 
@@ -80,6 +67,11 @@ export default function FindSurgeon() {
       setLoading(false);
     };
     load();
+
+    // Fetch specialties from API — replaces hardcoded array
+    axios.get(`${API_URL}/api/specialties`)
+      .then(res => setSpecialties(res.data.specialties || []))
+      .catch(err => console.error('Failed to load specialties:', err));
   }, []);
 
   // ── APPLY FILTERS ──────────────────────────────────────────────────────────
@@ -207,8 +199,9 @@ export default function FindSurgeon() {
             className="input-field"
             style={{ width: 'auto', minWidth: '180px', fontSize: '14px' }}
           >
-            {SPECIALTIES.map(s => (
-              <option key={s} value={s}>{s}</option>
+            <option value="All Specialties">All Specialties</option>
+            {specialties.map(s => (
+              <option key={s.id} value={s.name}>{s.name}</option>
             ))}
           </select>
 

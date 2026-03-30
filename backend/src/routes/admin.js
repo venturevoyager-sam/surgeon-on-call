@@ -461,35 +461,10 @@ router.patch('/cases/:id/override', async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/admin/surgeons
-// Returns all surgeons with optional status filter
-// Called by: Admin Dashboard — Surgeons tab
-// ─────────────────────────────────────────────────────────────────────────────
-router.get('/surgeons', async (req, res) => {
-  const { filter } = req.query; // 'all' | 'pending' | 'verified' | 'suspended'
-  logger.info('Admin: fetching surgeons', { filter });
-
-  try {
-    let query = supabase
-      .from('surgeons')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (filter === 'pending')   query = query.eq('verified', false).eq('status', 'active');
-    if (filter === 'verified')  query = query.eq('verified', true).eq('status', 'active');
-    if (filter === 'suspended') query = query.eq('status', 'suspended');
-
-    const { data: surgeons, error } = await query;
-    if (error) throw error;
-
-    logger.info('Admin: surgeons fetched', { count: surgeons.length });
-    return res.json({ surgeons });
-  } catch (error) {
-    logger.error('Admin: failed to fetch surgeons', { error: error.message });
-    return res.status(500).json({ message: 'Failed to fetch surgeons' });
-  }
-});
+// DUPLICATE REMOVED: A second GET /api/admin/surgeons route was here (lines 469-492
+// of the original file). It was less complete than the first definition at the top
+// of this file (which has search filtering and availability filtering). Removed to
+// prevent Express route shadowing.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/admin/surgeons/:id/verify
@@ -559,37 +534,10 @@ router.patch('/surgeons/:id/suspend', async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/admin/cases
-// Returns all cases across all hospitals with optional filter
-// Called by: Admin Dashboard — Cases tab
-// ─────────────────────────────────────────────────────────────────────────────
-router.get('/cases', async (req, res) => {
-  const { filter } = req.query; // 'all' | 'active' | 'cascading' | 'confirmed' | 'completed' | 'unfilled'
-  logger.info('Admin: fetching all cases', { filter });
-
-  try {
-    let query = supabase
-      .from('cases')
-      .select(`
-        *,
-        hospitals ( name, city ),
-        surgeons!cases_confirmed_surgeon_id_fkey ( name, phone )
-      `)
-      .order('created_at', { ascending: false });
-
-    if (filter && filter !== 'all') query = query.eq('status', filter);
-
-    const { data: cases, error } = await query;
-    if (error) throw error;
-
-    logger.info('Admin: cases fetched', { count: cases.length });
-    return res.json({ cases });
-  } catch (error) {
-    logger.error('Admin: failed to fetch cases', { error: error.message });
-    return res.status(500).json({ message: 'Failed to fetch cases' });
-  }
-});
+// DUPLICATE REMOVED: A second GET /api/admin/cases route was here (lines 567-592
+// of the original file). It was less complete than the first definition at the top
+// of this file (which has search filtering and hospital/surgeon joins). Removed to
+// prevent Express route shadowing.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/admin/cases/:id/status
@@ -829,5 +777,53 @@ router.get('/earnings', async (req, res) => {
     return res.status(500).json({ message: 'Failed to fetch earnings' });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/admin/hospitals/:id/verify
+// Verify or unverify a hospital registration.
+// Body: { verified: true | false }
+// When verified = true:  hospital can log in and post cases.
+// When verified = false: hospital is blocked from posting new cases.
+//
+// Follows the same pattern as PATCH /api/admin/surgeons/:id/verify.
+// Called by: Admin Dashboard — Hospitals tab
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/hospitals/:id/verify', async (req, res) => {
+  const { id } = req.params;
+  const { verified } = req.body;
+
+  logger.info('Admin: hospital verification action', { hospital_id: id, verified });
+
+  if (verified === undefined || typeof verified !== 'boolean') {
+    return res.status(400).json({ message: 'verified (boolean) is required' });
+  }
+
+  try {
+    const { data: hospital, error } = await supabase
+      .from('hospitals')
+      .update({ verified })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    logger.info('Admin: hospital verification updated', {
+      hospital_id: id,
+      name: hospital.name,
+      verified,
+    });
+
+    return res.json({
+      message: `Hospital ${verified ? 'verified' : 'unverified'} successfully`,
+      hospital,
+    });
+
+  } catch (error) {
+    logger.error('Admin: failed to verify hospital', { error: error.message });
+    return res.status(500).json({ message: 'Failed to update hospital' });
+  }
+});
+
 
 module.exports = router;
