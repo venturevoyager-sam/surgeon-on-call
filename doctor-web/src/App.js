@@ -1,6 +1,6 @@
 /**
  * APP.JS — Doctor Web (Surgeon Portal)
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Routes:
  *   /login              → Phone + password login

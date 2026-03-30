@@ -1,6 +1,6 @@
 /**
  * DASHBOARD PAGE - Hospital Web App
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * Header (updated):
  *   Logo | Find a Surgeon | + New Request | 🔔 (placeholder) | Hospital Name | Logout
@@ -15,8 +15,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { API_URL } from '../lib/config';
 
 export default function Dashboard() {
   // ── STATE ──────────────────────────────────────────────────────────────────

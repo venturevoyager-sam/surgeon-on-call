@@ -2,7 +2,7 @@
  * surgeon-on-call/backend/src/notifications.js
  *
  * NOTIFICATION SERVICE
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Handles all outbound notifications to surgeons via:
  *   1. WhatsApp (primary) — via Twilio WhatsApp sandbox
@@ -133,7 +133,7 @@ You have a new surgery request:
 
 Open the Surgeon on Call app to accept or decline.
 
-_Vaidhya Healthcare Pvt Ltd_`;
+_Surgeon on Call_`;
 }
 
 // Sent when a case is passed to the next surgeon (previous one declined/expired)
@@ -153,7 +153,7 @@ A surgery case has been passed to you:
 
 Open the Surgeon on Call app to accept or decline.
 
-_Vaidhya Healthcare Pvt Ltd_`;
+_Surgeon on Call_`;
 }
 
 // Sent 24 hours before surgery as a reminder
@@ -171,7 +171,7 @@ Reminder: You have a confirmed surgery tomorrow.
 
 Our associate will contact you with the full hospital address shortly.
 
-_Vaidhya Healthcare Pvt Ltd_`;
+_Surgeon on Call_`;
 }
 
 // ── EXPORTED NOTIFICATION FUNCTIONS ───────────────────────────────────────────

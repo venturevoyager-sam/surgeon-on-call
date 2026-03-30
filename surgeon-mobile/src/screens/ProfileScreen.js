@@ -301,7 +301,7 @@ export default function ProfileScreen({ onLogout, surgeonId }) {
               <Text style={styles.verificationTitle}>{surgeon?.verified ? '✅ Account Verified' : '⏳ Pending Verification'}</Text>
               <Text style={styles.verificationSubtext}>
                 {surgeon?.verified
-                  ? 'Your account has been verified by the Vaidhya Healthcare team. You are eligible to receive surgery requests.'
+                  ? 'Your account has been verified by the Surgeon on Call team. You are eligible to receive surgery requests.'
                   : 'Upload your documents below. Our team will verify your credentials within 24-48 hours.'}
               </Text>
             </View>

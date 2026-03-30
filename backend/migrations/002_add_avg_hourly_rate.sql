@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Migration 002: Add avg_hourly_rate column to surgeons table and seed values
 -- ============================================================================
--- Project : Surgeon on Call — Vaidhya Healthcare Pvt Ltd
+-- Project : Surgeon on Call — Surgeon on Call (OPC) Pvt Ltd
 -- Date    : 2026-03-29
 -- Author  : Claude (AI-assisted)
 --

@@ -1,6 +1,6 @@
 /**
  * NEW SURGERY REQUEST PAGE - Hospital Web App
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * What this page does:
  * 1. Hospital SPOC fills in surgery details
@@ -24,6 +24,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { API_URL } from '../lib/config';
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 
@@ -48,8 +49,6 @@ const ALLOWED_EXTS   = '.pdf, .jpg, .jpeg, .png, .webp, .heic, .heif';
 // Bucket name: case-documents
 // Set to "private" — we generate signed URLs on upload
 const STORAGE_BUCKET = 'case-documents';
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 
 // ── HELPER: format bytes to human-readable size ────────────────────────────────

@@ -1,6 +1,6 @@
 /**
  * CASE DETAIL PAGE - Hospital Web App
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Shows the full status of a surgery request.
  *
@@ -25,8 +25,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { API_URL } from '../lib/config';
 
 // SPECIALTY_OPTIONS: removed — was hardcoded with different naming than other pages,
 // causing a mismatch bug. Now fetched from GET /api/specialties (see useEffect below).

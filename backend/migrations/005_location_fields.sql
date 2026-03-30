@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Migration 005: Add location fields to surgeons and hospitals tables
 -- ============================================================================
--- Project : Surgeon on Call — Vaidhya Healthcare Pvt Ltd
+-- Project : Surgeon on Call — Surgeon on Call (OPC) Pvt Ltd
 -- Date    : 2026-03-29
 -- Author  : Claude (AI-assisted)
 --

@@ -1,6 +1,6 @@
 /**
  * SURGEONS ROUTES - Backend API
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Handles all API endpoints for the Surgeon Mobile App:
  *

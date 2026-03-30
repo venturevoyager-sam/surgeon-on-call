@@ -1,8 +1,8 @@
 /**
  * ADMIN DASHBOARD - Surgeon on Call
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
- * Full admin control panel for the Vaidhya operations team.
+ * Full admin control panel for the Surgeon on Call operations team.
  *
  * Tabs:
  * 1. Overview  — platform stats at a glance
@@ -72,7 +72,7 @@ export default function App() {
             Surgeon <span className="text-blue-300">on Call</span>
             <span className="ml-3 text-xs bg-blue-700 text-blue-200 px-2 py-1 rounded-full font-normal">Admin</span>
           </h1>
-          <p className="text-blue-400 text-xs mt-0.5">Vaidhya Healthcare Pvt Ltd</p>
+          <p className="text-blue-400 text-xs mt-0.5">Surgeon on Call (OPC) Pvt Ltd</p>
         </div>
         <div className="text-blue-300 text-sm">Operations Dashboard</div>
       </nav>

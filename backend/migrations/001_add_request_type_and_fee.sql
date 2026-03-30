@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Migration 001: Add request_type and fee columns to the cases table
 -- ============================================================================
--- Project : Surgeon on Call — Vaidhya Healthcare Pvt Ltd
+-- Project : Surgeon on Call — Surgeon on Call (OPC) Pvt Ltd
 -- Date    : 2026-03-27
 -- Author  : Claude (AI-assisted)
 --

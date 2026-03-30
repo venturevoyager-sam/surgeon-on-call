@@ -1,6 +1,6 @@
 /**
  * SPECIALTIES ROUTES - Backend API
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Endpoints:
  * - GET /api/specialties → List all active specialties

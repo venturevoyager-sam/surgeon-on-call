@@ -1,6 +1,6 @@
 /**
  * ADMIN ROUTES - Backend API
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Handles all API endpoints for the Admin Dashboard.
  * These routes give the platform admin a global view across all hospitals,

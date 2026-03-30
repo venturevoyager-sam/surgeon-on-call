@@ -1,6 +1,6 @@
 /**
  * LOGGER - Backend API
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Centralised logging for the entire backend.
  * Every API request, response, error, and key event is logged here.

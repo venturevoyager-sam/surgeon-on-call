@@ -1,6 +1,6 @@
 /**
  * HOSPITAL SIGNUP PAGE - Hospital Web App
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * Self-registration form for new hospitals to join the platform.
  * Submits to POST /api/hospitals/register which creates:
@@ -18,6 +18,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../lib/config';
 
 // ── Leaflet imports for the location picker map ──────────────────────────────
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
@@ -33,8 +34,6 @@ L.Icon.Default.mergeOptions({
   iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 // ── Hospital type options ────────────────────────────────────────────────────
 const HOSPITAL_TYPES = [
@@ -328,7 +327,7 @@ export default function HospitalSignup() {
             Surgeon <span style={{ color: '#E56717' }}>on Call</span>
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginTop: '10px' }}>
-            by Vaidhya Healthcare Pvt Ltd
+            Surgeon on Call
           </p>
         </div>
 

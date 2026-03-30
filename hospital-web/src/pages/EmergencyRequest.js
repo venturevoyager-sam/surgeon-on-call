@@ -1,6 +1,6 @@
 /**
  * EMERGENCY REQUEST PAGE - Hospital Web App
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * What this page does:
  * 1. Hospital SPOC fills in a minimal emergency form (no 48hr restriction)
@@ -23,13 +23,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { API_URL } from '../lib/config';
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 
 // SPECIALTIES: fetched from GET /api/specialties on mount (see useEffect below).
 // Removed hardcoded array — now driven by the specialties table in the database.
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────

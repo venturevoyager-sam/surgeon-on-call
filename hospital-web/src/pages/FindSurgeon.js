@@ -1,6 +1,6 @@
 /**
  * FIND A SURGEON PAGE — Hospital Web App
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * Allows the hospital SPOC to:
  * 1. Browse all verified surgeons on the platform
@@ -18,8 +18,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { API_URL } from '../lib/config';
 
 // SPECIALTIES: fetched from GET /api/specialties on mount (see useEffect below).
 // Removed hardcoded array — now driven by the specialties table in the database.

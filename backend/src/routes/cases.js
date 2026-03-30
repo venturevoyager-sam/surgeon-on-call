@@ -1,6 +1,6 @@
 /**
  * CASES ROUTES - Backend API
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Endpoints:
  * - POST /api/cases/draft        → Create empty draft case with pre-assigned surgeon

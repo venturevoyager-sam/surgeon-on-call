@@ -1,0 +1,49 @@
+# ============================================================================
+# RENDER DEPLOYMENT CONFIG — Surgeon on Call Backend API
+# Company: Surgeon on Call (OPC) Pvt Ltd
+#
+# This file tells Render.com how to build and run the backend service.
+# Place this in the backend/ folder (or reference rootDir: backend from repo root).
+#
+# Render reads this file on deploy to configure the service automatically.
+# Docs: https://render.com/docs/blueprint-spec
+# ============================================================================
+
+services:
+  # ── Service type: "web" means an HTTP server exposed to the internet ────────
+  # Other types: "worker" (background), "cron" (scheduled), "static" (static site)
+  - type: web
+
+    # ── Service name as it appears in the Render dashboard ────────────────────
+    name: surgeon-on-call-api
+
+    # ── Runtime environment — Render will provision a Node.js container ────────
+    # Render auto-detects the Node version from package.json "engines" field,
+    # or defaults to the latest LTS version.
+    runtime: node
+
+    # ── Root directory relative to the Git repo root ──────────────────────────
+    # Since the repo has multiple apps (hospital-web, doctor-web, etc.),
+    # this tells Render to cd into backend/ before building and starting.
+    rootDir: backend
+
+    # ── Build command — runs once on each deploy to install dependencies ──────
+    # Installs all packages from package.json + package-lock.json.
+    # Render runs this in the rootDir (backend/).
+    buildCommand: npm install
+
+    # ── Start command — runs the server process ───────────────────────────────
+    # Executes "node src/index.js" (defined in package.json scripts.start).
+    # Render assigns a PORT env var automatically — our server reads it via
+    # process.env.PORT || 5000 in src/index.js.
+    startCommand: npm start
+
+    # ── Environment variables ─────────────────────────────────────────────────
+    # Variables listed here are set in the Render environment.
+    # Secrets (SUPABASE_ANON_KEY, TWILIO_AUTH_TOKEN, GMAIL_APP_PASSWORD, etc.)
+    # should be added via the Render dashboard, NOT in this file.
+    envVars:
+      # Tells Express and other libraries to optimize for production
+      # (disables verbose error messages, enables caching, etc.)
+      - key: NODE_ENV
+        value: production

@@ -78,7 +78,7 @@ export default function EarningsScreen() {
       {/* ── HEADER ── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Earnings</Text>
-        <Text style={styles.headerSubtitle}>Vaidhya Healthcare Pvt Ltd</Text>
+        <Text style={styles.headerSubtitle}>Surgeon on Call</Text>
       </View>
 
       <ScrollView

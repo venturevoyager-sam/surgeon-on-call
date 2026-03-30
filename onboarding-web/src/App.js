@@ -1,6 +1,6 @@
 /**
  * ONBOARDING LANDING PAGE — Surgeon on Call
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Single-page landing that routes visitors to the appropriate app:
  *   - Doctors  → doctor-web (port 3001)
@@ -48,7 +48,7 @@ export default function App() {
 
         {/* Subtle company name on the right */}
         <span className="text-xs hidden sm:block" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          Vaidhya Healthcare Pvt Ltd
+          Surgeon on Call
         </span>
       </header>
 
@@ -191,7 +191,7 @@ export default function App() {
         className="px-6 py-5 text-center text-xs"
         style={{ borderTop: '1px solid #E8E0D8', color: '#8B8B8B' }}
       >
-        © 2026 Vaidhya Healthcare Pvt Ltd. All rights reserved.
+        © 2025 Surgeon on Call
       </footer>
 
     </div>

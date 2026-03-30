@@ -1,6 +1,6 @@
 /**
  * APP.JS - Root Component
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * Routes:
  *   /                         → Login

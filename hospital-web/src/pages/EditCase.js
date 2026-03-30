@@ -1,6 +1,6 @@
 /**
  * EDIT CASE PAGE — Hospital Web App
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * Shown after a hospital books a surgeon via "Find a Surgeon".
  * The case is already created in DB as a "draft" with the surgeon pre-assigned.
@@ -21,8 +21,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { API_URL } from '../lib/config';
 
 // SPECIALTIES array removed — was dead code (never referenced in JSX).
 // EditCase uses surgeon.specialty[] from the pre-assigned surgeon, not a global list.

@@ -1,6 +1,6 @@
 /**
  * SHORTLIST PAGE - Hospital Web App
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * After a hospital posts a surgery request, they land here.
  * This page shows matched surgeons and lets the SPOC:
@@ -24,8 +24,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { API_URL } from '../lib/config';
 
 
 // ── HELPERS (pure functions, used in render) ─────────────────────────────────

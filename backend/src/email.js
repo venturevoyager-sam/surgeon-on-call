@@ -1,6 +1,6 @@
 /**
  * EMAIL UTILITY — Nodemailer Gmail SMTP
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  *
  * Sends email notifications for platform events (new registrations, etc.)
  * Uses Gmail SMTP with an App Password for authentication.

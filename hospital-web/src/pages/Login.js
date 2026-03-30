@@ -1,6 +1,6 @@
 /**
  * LOGIN PAGE - Hospital Web App
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * Split layout:
  *   Left  — brand panel (dark charcoal, logo, tagline, trust signals)
@@ -13,8 +13,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import { API_URL } from '../lib/config';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -108,7 +107,7 @@ export default function Login() {
             Surgeon <span style={{ color: '#E56717' }}>on Call</span>
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginTop: '10px' }}>
-            by Vaidhya Healthcare Pvt Ltd
+            Surgeon on Call
           </p>
         </div>
 

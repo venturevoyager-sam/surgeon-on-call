@@ -23,7 +23,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2C1A0E"
       },
-      "package": "com.vaidhya.surgeononcall"
+      "package": "com.surgeononcall.doctor"
     },
     "web": {
       "favicon": "./assets/favicon.png"

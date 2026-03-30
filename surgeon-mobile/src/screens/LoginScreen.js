@@ -52,7 +52,7 @@ export default function LoginScreen({ onLogin }) {
         <View style={styles.header}>
           <Text style={styles.logo}>🏥</Text>
           <Text style={styles.appName}>Surgeon on Call</Text>
-          <Text style={styles.company}>Vaidhya Healthcare Pvt Ltd</Text>
+          <Text style={styles.company}>Surgeon on Call</Text>
           <Text style={styles.tagline}>Sign in to your surgeon account</Text>
         </View>
 

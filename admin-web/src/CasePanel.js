@@ -1,6 +1,6 @@
 /**
  * CASE PANEL - Admin Web
- * Vaidhya Healthcare Pvt Ltd
+ * Surgeon on Call (OPC) Pvt Ltd
  *
  * A slide-out panel that opens from the right when admin clicks a case ID.
  * Shows full case details including clinical documents uploaded by the hospital.

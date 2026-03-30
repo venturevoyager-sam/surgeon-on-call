@@ -2,7 +2,7 @@
  * surgeon-on-call/backend/src/routes/admin.js
  *
  * ADMIN ROUTES - Backend API
- * Company: Vaidhya Healthcare Pvt Ltd
+ * Company: Surgeon on Call (OPC) Pvt Ltd
  */
 
 const express = require('express');
