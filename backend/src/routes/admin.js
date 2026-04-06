@@ -12,6 +12,7 @@
  *   GET  /api/admin/surgeons        → All verified surgeons (filterable)
  *   GET  /api/admin/hospitals       → All hospitals with status and case counts
  *   PATCH /api/admin/cases/:id/override → Manually assign a surgeon to a case
+ *   PATCH /api/admin/surgeons/:id/profile → Edit surgeon profile fields
  *
  * DEV_MODE: No auth required — all routes are open during development.
  * PRODUCTION TODO: Lock all admin routes behind admin JWT or session auth.
@@ -481,7 +482,7 @@ router.patch('/surgeons/:id/verify', async (req, res) => {
   try {
     const updates = action === 'verify'
       ? { verified: true, status: 'active', available: true }
-      : { verified: false, status: 'rejected' };
+      : { verified: false, status: 'suspended', available: false };
 
     const { data: surgeon, error } = await supabase
       .from('surgeons')
@@ -490,13 +491,16 @@ router.patch('/surgeons/:id/verify', async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      logger.error('Admin: Supabase error verifying surgeon', { error: error.message, details: error.details, hint: error.hint });
+      return res.status(500).json({ message: 'Failed to update surgeon', error: error.message });
+    }
 
     logger.info('Admin: surgeon verification updated', { surgeon_id: id, action });
     return res.json({ message: `Surgeon ${action}ed successfully`, surgeon });
   } catch (error) {
     logger.error('Admin: failed to verify surgeon', { error: error.message });
-    return res.status(500).json({ message: 'Failed to update surgeon' });
+    return res.status(500).json({ message: 'Failed to update surgeon', error: error.message });
   }
 });
 
@@ -531,6 +535,66 @@ router.patch('/surgeons/:id/suspend', async (req, res) => {
   } catch (error) {
     logger.error('Admin: failed to suspend surgeon', { error: error.message });
     return res.status(500).json({ message: 'Failed to update surgeon' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/admin/surgeons/:id/profile
+// Edit any surgeon's profile fields (name, phone, specialty, etc.)
+// Body: partial object with fields to update
+// Called by: Admin Dashboard — Surgeons tab (Edit modal)
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/surgeons/:id/profile', async (req, res) => {
+  const { id } = req.params;
+  const {
+    name, phone, email, city,
+    specialty, experience_years, mci_number,
+    bio, hospital_affiliations, avg_hourly_rate, available,
+    profile_photo_url, certificate_url, government_id_url, resume_url,
+  } = req.body;
+
+  logger.info('Admin: editing surgeon profile', { surgeon_id: id });
+
+  try {
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (phone !== undefined) updates.phone = phone;
+    if (email !== undefined) updates.email = email;
+    if (city !== undefined) updates.city = city;
+    if (specialty !== undefined) updates.specialty = specialty;
+    if (experience_years !== undefined) updates.experience_years = experience_years;
+    if (mci_number !== undefined) updates.mci_number = mci_number;
+    if (bio !== undefined) updates.bio = bio;
+    if (hospital_affiliations !== undefined) updates.hospital_affiliations = hospital_affiliations;
+    if (avg_hourly_rate !== undefined) updates.avg_hourly_rate = avg_hourly_rate;
+    if (available !== undefined) updates.available = available;
+    if (profile_photo_url !== undefined) updates.profile_photo_url = profile_photo_url;
+    if (certificate_url !== undefined) updates.certificate_url = certificate_url;
+    if (government_id_url !== undefined) updates.government_id_url = government_id_url;
+    if (resume_url !== undefined) updates.resume_url = resume_url;
+    updates.updated_at = new Date().toISOString();
+
+    if (Object.keys(updates).length <= 1) {
+      return res.status(400).json({ message: 'No fields to update' });
+    }
+
+    const { data: surgeon, error } = await supabase
+      .from('surgeons')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Admin: Supabase error updating surgeon', { error: error.message, details: error.details, hint: error.hint, code: error.code });
+      return res.status(500).json({ message: 'Failed to update surgeon profile', error: error.message });
+    }
+
+    logger.info('Admin: surgeon profile updated', { surgeon_id: id, fields: Object.keys(updates) });
+    return res.json({ message: 'Surgeon profile updated successfully', surgeon });
+  } catch (error) {
+    logger.error('Admin: failed to update surgeon profile', { error: error.message, stack: error.stack });
+    return res.status(500).json({ message: 'Failed to update surgeon profile', error: error.message });
   }
 });
 

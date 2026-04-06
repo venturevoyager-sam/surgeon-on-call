@@ -40,24 +40,28 @@ export default function HomeScreen({ navigation, surgeonId }) {
 
       // ── Sort incoming requests by urgency ────────────────────────────────
       // 1. Emergency cases always pinned to top
-      // 2. Non-emergency sorted by expires_at ascending (soonest deadline first)
-      // 3. Requests with no expires_at sink to the bottom
+      // 2. Non-emergency sorted by most recent first (notified_at descending)
       const sorted = [...(requestsRes.data.incoming_requests || [])].sort((a, b) => {
         const aEmergency = a.request_type === 'emergency';
         const bEmergency = b.request_type === 'emergency';
-
-        // Emergency cases always come first
         if (aEmergency && !bEmergency) return -1;
         if (!aEmergency && bEmergency) return 1;
-
-        // Within the same group, sort by soonest expires_at
-        const aExp = a.expires_at ? new Date(a.expires_at).getTime() : Infinity;
-        const bExp = b.expires_at ? new Date(b.expires_at).getTime() : Infinity;
-        return aExp - bExp;
+        const aTime = a.notified_at ? new Date(a.notified_at).getTime() : 0;
+        const bTime = b.notified_at ? new Date(b.notified_at).getTime() : 0;
+        return bTime - aTime;
       });
 
       setIncomingRequests(sorted);
-      setUpcomingCases(requestsRes.data.upcoming_cases || []);
+
+      // Sort upcoming: emergency first, then most recent (surgery_date descending)
+      const sortedUpcoming = [...(requestsRes.data.upcoming_cases || [])].sort((a, b) => {
+        const aE = a.request_type === 'emergency';
+        const bE = b.request_type === 'emergency';
+        if (aE && !bE) return -1;
+        if (!aE && bE) return 1;
+        return new Date(b.surgery_date) - new Date(a.surgery_date);
+      });
+      setUpcomingCases(sortedUpcoming);
       setError('');
     } catch (err) {
       setError('Could not load data. Check your connection.');

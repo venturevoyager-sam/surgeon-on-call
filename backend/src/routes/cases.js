@@ -1065,6 +1065,29 @@ router.patch('/:caseId/accept', async (req, res) => {
       return res.status(400).json({ message: 'surgeon_id required' });
     }
 
+    // ── Guard: check if case is already confirmed by another surgeon ──
+    const { data: currentCase, error: checkError } = await supabase
+      .from('cases')
+      .select('status, confirmed_surgeon_id')
+      .eq('id', caseId)
+      .single();
+
+    if (checkError) {
+      logger.error('Failed to check case status', { error: checkError.message });
+      return res.status(500).json({ message: 'Failed to accept case' });
+    }
+
+    if (currentCase.status === 'confirmed' || currentCase.status === 'completed') {
+      logger.warn('Case already accepted by another surgeon', {
+        case_id: caseId,
+        surgeon_id,
+        confirmed_surgeon_id: currentCase.confirmed_surgeon_id,
+      });
+      return res.status(409).json({
+        message: 'This case has already been accepted by another surgeon',
+      });
+    }
+
     const now = new Date().toISOString();
 
     // Update priority list row to accepted

@@ -21,6 +21,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import CasePanel from './CasePanel'; // ← slide-out panel with documents
+import { supabase, STORAGE_BUCKET } from './lib/supabase';
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -486,6 +487,14 @@ function SurgeonsTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searching,   setSearching]   = useState(false);
 
+  // ── Edit surgeon modal state ──
+  const [editSurgeon, setEditSurgeon] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [specialties, setSpecialties] = useState([]);
+  const [specSearch, setSpecSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState({});
+
   // Debounce search input — waits 300ms after last keystroke
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput), 300);
@@ -511,7 +520,97 @@ function SurgeonsTab() {
 
   useEffect(() => { fetchSurgeons(); }, [fetchSurgeons]);
 
+  // Fetch specialties reference list for the edit modal multi-select
+  useEffect(() => {
+    axios.get(`${API_URL}/api/specialties`)
+      .then(res => setSpecialties(res.data.specialties || res.data || []))
+      .catch(() => {});
+  }, []);
+
   const showMsg = (msg) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 3000); };
+
+  // ── Edit surgeon helpers ──
+  const openEditModal = (s) => {
+    setEditSurgeon(s);
+    setEditForm({
+      name: s.name || '',
+      phone: s.phone || '',
+      email: s.email || '',
+      city: s.city || '',
+      specialty: Array.isArray(s.specialty) ? [...s.specialty] : [],
+      experience_years: s.experience_years || '',
+      mci_number: s.mci_number || '',
+      bio: s.bio || '',
+      hospital_affiliations: s.hospital_affiliations || '',
+      avg_hourly_rate: s.avg_hourly_rate ? s.avg_hourly_rate / 100 : '',
+      available: s.available ?? true,
+      profile_photo_url: s.profile_photo_url || '',
+      certificate_url: s.certificate_url || '',
+      government_id_url: s.government_id_url || '',
+      resume_url: s.resume_url || '',
+    });
+    setSpecSearch('');
+    setUploading({});
+  };
+
+  const toggleSpec = (name) => {
+    setEditForm(prev => ({
+      ...prev,
+      specialty: prev.specialty.includes(name)
+        ? prev.specialty.filter(sp => sp !== name)
+        : [...prev.specialty, name],
+    }));
+  };
+
+  const uploadFile = async (file, field) => {
+    if (!editSurgeon) return;
+    setUploading(p => ({ ...p, [field]: true }));
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${editSurgeon.id}_${field}_${Date.now()}_${safeName}`;
+      const { data, error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { cacheControl: '3600', upsert: false });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+      // Save URL to profile immediately
+      await axios.patch(`${API_URL}/api/admin/surgeons/${editSurgeon.id}/profile`, { [field]: urlData.publicUrl });
+      setEditForm(p => ({ ...p, [field]: urlData.publicUrl }));
+      showMsg(`${field.replace(/_/g, ' ').replace('url', '').trim()} uploaded`);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      showMsg('Upload failed');
+    } finally {
+      setUploading(p => ({ ...p, [field]: false }));
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editSurgeon) return;
+    setSaving(true);
+    try {
+      const payload = {
+        name: editForm.name || null,
+        phone: editForm.phone || null,
+        email: editForm.email || null,
+        city: editForm.city || null,
+        specialty: editForm.specialty,
+        experience_years: editForm.experience_years ? Number(editForm.experience_years) : null,
+        mci_number: editForm.mci_number || null,
+        bio: editForm.bio || null,
+        hospital_affiliations: editForm.hospital_affiliations || null,
+        avg_hourly_rate: editForm.avg_hourly_rate ? Math.round(Number(editForm.avg_hourly_rate) * 100) : null,
+        available: editForm.available,
+      };
+      await axios.patch(`${API_URL}/api/admin/surgeons/${editSurgeon.id}/profile`, payload);
+      showMsg('Surgeon profile updated');
+      setEditSurgeon(null);
+      fetchSurgeons();
+    } catch (err) {
+      console.error('Save edit error:', err.response?.data || err.message);
+      showMsg(err.response?.data?.message || 'Failed to update surgeon');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const verifyAction = async (id, action) => {
     try {
@@ -618,6 +717,7 @@ function SurgeonsTab() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
+                        <ActionBtn color="blue" onClick={() => openEditModal(s)}>Edit</ActionBtn>
                         {!s.verified && s.status !== 'suspended' && (
                           <>
                             <ActionBtn color="green" onClick={() => verifyAction(s.id, 'verify')}>Verify</ActionBtn>
@@ -652,6 +752,153 @@ function SurgeonsTab() {
             </table>
           )}
         </div>
+      )}
+
+      {/* ── Edit Surgeon Modal ── */}
+      {editSurgeon && (
+        <Modal title={`Edit Surgeon — ${editSurgeon.name}`} onClose={() => setEditSurgeon(null)} maxWidth="max-w-2xl">
+          <div className="grid grid-cols-2 gap-4">
+            {/* Name */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Name</label>
+              <input type="text" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </div>
+            {/* Phone */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Phone</label>
+              <input type="text" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </div>
+            {/* Email */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Email</label>
+              <input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </div>
+            {/* MCI Number */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">MCI Number</label>
+              <input type="text" value={editForm.mci_number} onChange={e => setEditForm(f => ({ ...f, mci_number: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </div>
+            {/* City */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">City</label>
+              <input type="text" value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </div>
+            {/* Experience Years */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Experience (years)</label>
+              <input type="number" min="0" value={editForm.experience_years} onChange={e => setEditForm(f => ({ ...f, experience_years: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </div>
+            {/* Hourly Rate */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Hourly Rate (₹)</label>
+              <input type="number" min="0" value={editForm.avg_hourly_rate} onChange={e => setEditForm(f => ({ ...f, avg_hourly_rate: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </div>
+            {/* Hospital Affiliations — full width */}
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Hospital Affiliations</label>
+              <input type="text" value={editForm.hospital_affiliations} onChange={e => setEditForm(f => ({ ...f, hospital_affiliations: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </div>
+            {/* Bio — full width */}
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Bio</label>
+              <textarea rows={3} value={editForm.bio} onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none" />
+            </div>
+            {/* Specialties multi-select — full width */}
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                Specialties ({editForm.specialty?.length || 0} selected)
+              </label>
+              <input
+                type="text" placeholder="Search specialties..." value={specSearch}
+                onChange={e => setSpecSearch(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+              <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-1">
+                {specialties
+                  .filter(sp => (sp.name || sp).toLowerCase().includes(specSearch.toLowerCase()))
+                  .map(sp => {
+                    const name = sp.name || sp;
+                    const selected = editForm.specialty?.includes(name);
+                    return (
+                      <button key={name} type="button" onClick={() => toggleSpec(name)}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                          selected
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+            {/* Available toggle */}
+            <div className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" id="edit-available" checked={editForm.available}
+                onChange={e => setEditForm(f => ({ ...f, available: e.target.checked }))}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="edit-available" className="text-sm text-gray-700 font-medium">Available for cases</label>
+            </div>
+
+            {/* Documents & Photo uploads — full width */}
+            <div className="col-span-2 mt-2">
+              <label className="block text-xs font-semibold text-gray-500 mb-2">Documents & Display Picture</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ['profile_photo_url', 'Display Picture', 'image/*'],
+                  ['certificate_url', 'Certificate', '.pdf,.jpg,.jpeg,.png'],
+                  ['government_id_url', 'Government ID', '.pdf,.jpg,.jpeg,.png'],
+                  ['resume_url', 'Resume / CV', '.pdf,.jpg,.jpeg,.png'],
+                ].map(([field, label, accept]) => (
+                  <div key={field} className="border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-600">{label}</span>
+                      {editForm[field] && (
+                        <a href={editForm[field]} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline">View ↗</a>
+                      )}
+                    </div>
+                    {editForm[field] && field === 'profile_photo_url' && (
+                      <img src={editForm[field]} alt="Profile" className="w-12 h-12 rounded-full object-cover mb-2 border border-gray-200" />
+                    )}
+                    <input
+                      type="file"
+                      accept={accept}
+                      onChange={e => { if (e.target.files[0]) uploadFile(e.target.files[0], field); }}
+                      className="text-xs text-gray-500 w-full"
+                      disabled={uploading[field]}
+                    />
+                    {uploading[field] && (
+                      <p className="text-xs text-blue-600 mt-1 animate-pulse">Uploading...</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* Footer — sticky at bottom of scroll */}
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100 sticky bottom-0 bg-white pb-1">
+            <button onClick={() => setEditSurgeon(null)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+              Cancel
+            </button>
+            <button onClick={saveEdit} disabled={saving}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition">
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );
@@ -937,15 +1184,15 @@ function ActionBtn({ children, onClick, color = 'blue' }) {
   );
 }
 
-function Modal({ title, onClose, children }) {
+function Modal({ title, onClose, children, maxWidth = 'max-w-lg' }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[90vh] flex flex-col`}>
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
           <h3 className="text-lg font-bold text-gray-900">{title}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );

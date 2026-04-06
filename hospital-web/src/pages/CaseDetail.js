@@ -287,16 +287,16 @@ export default function CaseDetail() {
 
   // ── LOADING / ERROR ────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">Loading case details...</p>
+    <div className="min-h-screen bg-brand-light flex items-center justify-center">
+      <p className="text-muted">Loading case details...</p>
     </div>
   );
 
   if (error || !caseData) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-brand-light flex items-center justify-center">
       <div className="text-center">
         <p className="text-red-500 mb-4">{error || 'Case not found'}</p>
-        <button onClick={() => navigate('/dashboard')} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+        <button onClick={() => navigate('/dashboard')} className="btn-primary px-4 py-2 text-sm">
           Back to Dashboard
         </button>
       </div>
@@ -305,7 +305,7 @@ export default function CaseDetail() {
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-brand-light">
 
       {/* NEW (Migration 001): Keyframe animation for the emergency live pulsing dot.
           Defined inline via <style> to avoid modifying tailwind.config.js. */}
@@ -317,11 +317,22 @@ export default function CaseDetail() {
       `}</style>
 
       {/* ── NAV ── */}
-      <nav className="bg-blue-900 px-8 py-4 flex items-center justify-between">
-        <h1 className="text-white font-bold text-xl">
-          Surgeon <span className="text-blue-300">on Call</span>
-        </h1>
-        <button onClick={() => navigate('/dashboard')} className="text-blue-300 hover:text-white text-sm transition">
+      <nav className="topnav">
+        <div className="flex items-center">
+          <img
+            src="/logo.png"
+            alt="Surgeon on Call"
+            style={{ height: '36px', width: 'auto', objectFit: 'contain' }}
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'block';
+            }}
+          />
+          <h1 className="topnav-brand" style={{ display: 'none' }}>
+            Surgeon <span>on Call</span>
+          </h1>
+        </div>
+        <button onClick={() => navigate('/dashboard')} className="btn-ghost text-gray-400 hover:text-brand text-sm transition">
           ← Back to Dashboard
         </button>
       </nav>
@@ -332,7 +343,7 @@ export default function CaseDetail() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h2 className="text-2xl font-bold text-blue-900">
+              <h2 className="text-2xl font-bold text-body">
                 SOC-{String(caseData.case_number).padStart(3, '0')}
               </h2>
               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge[caseData.status]}`}>
@@ -348,7 +359,7 @@ export default function CaseDetail() {
                 </span>
               )}
             </div>
-            <p className="text-gray-500 text-sm">{caseData.procedure}</p>
+            <p className="text-muted text-sm">{caseData.procedure}</p>
           </div>
 
           {/* Action buttons */}
@@ -356,7 +367,7 @@ export default function CaseDetail() {
             {/* Edit button */}
             <button
               onClick={openEditModal}
-              className="bg-white border border-gray-200 hover:border-blue-400 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+              className="bg-white border border-warm hover:border-brand text-body hover:text-brand px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
             >
               ✏️ Edit
             </button>
@@ -364,7 +375,7 @@ export default function CaseDetail() {
             {/* Delete button */}
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="bg-white border border-gray-200 hover:border-red-400 text-gray-700 hover:text-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+              className="bg-white border border-warm hover:border-red-400 text-body hover:text-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
             >
               🗑️ Delete
             </button>
@@ -483,8 +494,8 @@ export default function CaseDetail() {
           <div className="col-span-1 flex flex-col gap-4">
 
             {/* Case Summary Card */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-4">Case Details</h3>
+            <div className="card">
+              <h3 className="font-semibold text-body text-sm uppercase tracking-wide mb-4">Case Details</h3>
               <div className="flex flex-col gap-3">
                 <Field label="Procedure"  value={caseData.procedure} />
                 <Field label="Specialty"  value={caseData.specialty_required} />
@@ -504,8 +515,8 @@ export default function CaseDetail() {
             </div>
 
             {/* Patient Card */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-4">Patient</h3>
+            <div className="card">
+              <h3 className="font-semibold text-body text-sm uppercase tracking-wide mb-4">Patient</h3>
               <div className="flex flex-col gap-3">
                 <Field label="Age"    value={`${caseData.patient_age} yrs`} />
                 <Field label="Gender" value={caseData.patient_gender} />
@@ -527,10 +538,10 @@ export default function CaseDetail() {
 
           {/* ── RIGHT COLUMN: Cascade tracker ── */}
           <div className="col-span-2">
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="card">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Surgeon Cascade</h3>
+                  <h3 className="font-semibold text-body text-sm uppercase tracking-wide">Surgeon Cascade</h3>
 
                   {/* NEW (Migration 001): Pulsing live indicator for emergency cases.
                       Shows when auto-polling is active (10s interval).
@@ -549,7 +560,7 @@ export default function CaseDetail() {
                 </div>
                 {timeLeft && (
                   <div className="text-right">
-                    <div className="text-xs text-gray-400">Waiting for response</div>
+                    <div className="text-xs text-muted">Waiting for response</div>
                     <div className="text-lg font-mono font-bold text-amber-600">{timeLeft}</div>
                   </div>
                 )}
@@ -557,11 +568,11 @@ export default function CaseDetail() {
 
               {priorityList.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-400 text-sm">No surgeons notified yet.</p>
+                  <p className="text-muted text-sm">No surgeons notified yet.</p>
                   {caseData.status === 'active' && (
                     <button
                       onClick={() => navigate(`/cases/${caseId}/shortlist`)}
-                      className="mt-4 bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-semibold transition"
+                      className="mt-4 btn-primary px-6 py-2 text-sm"
                     >
                       Select Surgeons →
                     </button>
@@ -581,9 +592,13 @@ export default function CaseDetail() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {priorityList.map((row, index) => (
-                    <CascadeRow key={row.id} row={row} index={index} />
-                  ))}
+                  {(() => {
+                    const acceptedRow = priorityList.find(r => r.status === 'accepted');
+                    const displayList = acceptedRow ? [acceptedRow] : priorityList;
+                    return displayList.map((row, index) => (
+                      <CascadeRow key={row.id} row={row} index={index} />
+                    ));
+                  })()}
 
                   {/* Banner when all surgeons have declined/expired — case is unfilled */}
                   {caseData.status === 'unfilled' && (
@@ -619,8 +634,8 @@ export default function CaseDetail() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
 
             {/* Modal header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Edit Case — SOC-{String(caseData.case_number).padStart(3, '0')}</h3>
+            <div className="flex items-center justify-between p-6 border-b border-warm">
+              <h3 className="text-lg font-bold text-body">Edit Case — SOC-{String(caseData.case_number).padStart(3, '0')}</h3>
               <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
 
@@ -635,25 +650,25 @@ export default function CaseDetail() {
 
               {/* Surgery details section */}
               <div>
-                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Surgery Details</h4>
+                <h4 className="text-xs font-bold text-muted uppercase tracking-wide mb-3">Surgery Details</h4>
                 <div className="grid grid-cols-2 gap-4">
 
                   <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Procedure Name</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Procedure Name</label>
                     <input
                       type="text"
                       value={editForm.procedure}
                       onChange={e => setEditForm({...editForm, procedure: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
 
                   <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Specialty Required</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Specialty Required</label>
                     <select
                       value={editForm.specialty_required}
                       onChange={e => setEditForm({...editForm, specialty_required: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     >
                       {specialties.length === 0
                         ? <option value="">Loading specialties...</option>
@@ -665,55 +680,55 @@ export default function CaseDetail() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Surgery Date</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Surgery Date</label>
                     <input
                       type="date"
                       value={editForm.surgery_date}
                       onChange={e => setEditForm({...editForm, surgery_date: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Surgery Time</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Surgery Time</label>
                     <input
                       type="time"
                       value={editForm.surgery_time}
                       onChange={e => setEditForm({...editForm, surgery_time: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Duration (hours)</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Duration (hours)</label>
                     <input
                       type="number"
                       step="0.5"
                       value={editForm.duration_hours}
                       onChange={e => setEditForm({...editForm, duration_hours: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">OT Number</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">OT Number</label>
                     <input
                       type="text"
                       value={editForm.ot_number}
                       onChange={e => setEditForm({...editForm, ot_number: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
 
                   {/* UPDATED (Migration 001): Single fee field replaces min/max */}
                   <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Surgeon Fee (₹)</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Surgeon Fee (₹)</label>
                     <input
                       type="number"
                       value={editForm.fee}
                       onChange={e => setEditForm({...editForm, fee: e.target.value})}
                       placeholder="e.g. 25000"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                     <p className="text-xs text-gray-400 mt-1">Total fee offered to surgeon. Platform deducts 5% commission.</p>
                   </div>
@@ -722,35 +737,35 @@ export default function CaseDetail() {
 
               {/* Patient details section */}
               <div>
-                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Patient Details</h4>
+                <h4 className="text-xs font-bold text-muted uppercase tracking-wide mb-3">Patient Details</h4>
                 <div className="grid grid-cols-2 gap-4">
 
                   <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Patient Name</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Patient Name</label>
                     <input
                       type="text"
                       value={editForm.patient_name}
                       onChange={e => setEditForm({...editForm, patient_name: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Age</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Age</label>
                     <input
                       type="number"
                       value={editForm.patient_age}
                       onChange={e => setEditForm({...editForm, patient_age: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Gender</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Gender</label>
                     <select
                       value={editForm.patient_gender}
                       onChange={e => setEditForm({...editForm, patient_gender: e.target.value})}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
                     >
                       <option value="male">Male</option>
                       <option value="female">Female</option>
@@ -759,12 +774,12 @@ export default function CaseDetail() {
                   </div>
 
                   <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Clinical Notes</label>
+                    <label className="block text-xs font-semibold text-muted mb-1">Clinical Notes</label>
                     <textarea
                       value={editForm.notes}
                       onChange={e => setEditForm({...editForm, notes: e.target.value})}
                       rows={3}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 resize-none"
+                      className="w-full border border-warm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand resize-none"
                     />
                   </div>
                 </div>
@@ -772,17 +787,17 @@ export default function CaseDetail() {
             </div>
 
             {/* Modal footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-warm">
               <button
                 onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-semibold"
+                className="px-4 py-2 text-sm text-muted hover:text-body font-semibold"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white px-6 py-2 rounded-lg text-sm font-semibold transition"
+                className="btn-primary px-6 py-2 text-sm disabled:opacity-60"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
@@ -795,14 +810,14 @@ export default function CaseDetail() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Case?</h3>
-            <p className="text-gray-500 text-sm mb-6">
+            <h3 className="text-lg font-bold text-body mb-2">Delete Case?</h3>
+            <p className="text-muted text-sm mb-6">
               This will permanently delete <strong>SOC-{String(caseData.case_number).padStart(3, '0')} — {caseData.procedure}</strong> and all associated data. This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-warm rounded-lg text-sm font-semibold text-muted hover:bg-brand-light"
               >
                 Cancel
               </button>
@@ -826,8 +841,8 @@ export default function CaseDetail() {
 function Field({ label, value }) {
   return (
     <div>
-      <div className="text-xs text-gray-400">{label}</div>
-      <div className="text-sm font-medium text-gray-800">{value || '—'}</div>
+      <div className="text-xs text-muted">{label}</div>
+      <div className="text-sm font-medium text-body">{value || '—'}</div>
     </div>
   );
 }
@@ -846,12 +861,12 @@ function CascadeRow({ row, index }) {
   return (
     <div className={`flex items-center justify-between p-4 rounded-xl border ${config.bg} ${config.border}`}>
       <div className="flex items-center gap-3">
-        <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">
+        <div className="w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: 'rgba(229,103,23,0.12)', color: '#E56717' }}>
           {index + 1}
         </div>
         <div>
-          <p className="font-semibold text-gray-800 text-sm">{row.surgeons?.name || '—'}</p>
-          <p className="text-xs text-gray-400">{row.surgeons?.specialty?.join(', ')}</p>
+          <p className="font-semibold text-body text-sm">{row.surgeons?.name || '—'}</p>
+          <p className="text-xs text-muted">{row.surgeons?.specialty?.join(', ')}</p>
         </div>
       </div>
       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${config.badge}`}>

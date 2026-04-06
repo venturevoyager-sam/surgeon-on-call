@@ -154,7 +154,10 @@ export default function RequestDetailScreen({ navigation, route }) {
             await axios.patch(`${CONFIG.API_URL}/api/cases/${caseId}/accept`, { surgeon_id: surgeonId });
             Alert.alert('✅ Case Accepted!', 'The hospital has been notified. Our associate will contact you shortly.',
               [{ text: 'OK', onPress: () => navigation.goBack() }]);
-          } catch { Alert.alert('Error', 'Could not accept case. Please try again.'); }
+          } catch (err) {
+            const msg = err.response?.data?.message || 'Could not accept case. Please try again.';
+            Alert.alert('Error', msg);
+          }
           finally { setSubmitting(false); }
         }},
       ]

@@ -34,18 +34,27 @@ export default function Home() {
       setSurgeon(profRes.data.surgeon);
       setAvailable(profRes.data.surgeon.available);
 
-      // Sort: emergency first, then by expires_at ascending
+      // Sort: emergency first, then by most recent (notified_at descending)
       const sorted = [...(reqRes.data.incoming_requests || [])].sort((a, b) => {
         const aE = a.request_type === 'emergency';
         const bE = b.request_type === 'emergency';
         if (aE && !bE) return -1;
         if (!aE && bE) return 1;
-        const aExp = a.expires_at ? new Date(a.expires_at).getTime() : Infinity;
-        const bExp = b.expires_at ? new Date(b.expires_at).getTime() : Infinity;
-        return aExp - bExp;
+        const aTime = a.notified_at ? new Date(a.notified_at).getTime() : 0;
+        const bTime = b.notified_at ? new Date(b.notified_at).getTime() : 0;
+        return bTime - aTime;
       });
       setRequests(sorted);
-      setUpcoming(reqRes.data.upcoming_cases || []);
+
+      // Sort upcoming: emergency first, then by most recent (surgery_date descending)
+      const sortedUpcoming = [...(reqRes.data.upcoming_cases || [])].sort((a, b) => {
+        const aE = a.request_type === 'emergency';
+        const bE = b.request_type === 'emergency';
+        if (aE && !bE) return -1;
+        if (!aE && bE) return 1;
+        return new Date(b.surgery_date) - new Date(a.surgery_date);
+      });
+      setUpcoming(sortedUpcoming);
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally { setLoading(false); }

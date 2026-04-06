@@ -137,6 +137,8 @@ router.get('/:id/requests', async (req, res) => {
 
     // ── INCOMING REQUESTS ─────────────────────────────────────────────────
     // Find all case_priority_list rows where this surgeon is notified
+    // and NOT yet expired (expires_at in the future or null for emergencies)
+    const now = new Date().toISOString();
     const { data: notifiedRows, error: notifiedError } = await supabase
       .from('case_priority_list')
       .select(`
@@ -155,16 +157,22 @@ router.get('/:id/requests', async (req, res) => {
       throw notifiedError;
     }
 
-    // For each notified row, fetch the case details
+    // Filter out expired requests (expires_at in the past)
+    const activeRows = (notifiedRows || []).filter(
+      row => !row.expires_at || new Date(row.expires_at) > new Date()
+    );
+
+    // For each active notified row, fetch the case details
     const incomingRequests = [];
-    for (const row of notifiedRows || []) {
+    for (const row of activeRows) {
       const { data: case_ } = await supabase
         .from('cases')
         .select('id, case_number, procedure, specialty_required, surgery_date, surgery_time, fee_min, fee_max, fee, status, request_type')
         .eq('id', row.case_id)
         .single();
 
-      if (case_) {
+      // Skip cases already confirmed by another surgeon
+      if (case_ && case_.status !== 'confirmed' && case_.status !== 'completed') {
         incomingRequests.push({
           case_id: row.case_id,
           priority_list_id: row.id,
@@ -182,7 +190,7 @@ router.get('/:id/requests', async (req, res) => {
 
     const { data: upcomingCases, error: upcomingError } = await supabase
       .from('cases')
-      .select('id, case_number, procedure, specialty_required, surgery_date, surgery_time, ot_number, fee_min, fee_max')
+      .select('id, case_number, procedure, specialty_required, surgery_date, surgery_time, ot_number, fee_min, fee_max, fee, request_type')
       .eq('confirmed_surgeon_id', id)
       .in('status', ['confirmed', 'in_progress'])
       .gte('surgery_date', today)

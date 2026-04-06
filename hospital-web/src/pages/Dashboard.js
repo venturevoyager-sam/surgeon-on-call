@@ -28,6 +28,8 @@ export default function Dashboard() {
 
   // NEW (Migration 001): Controls the request type selector dropdown
   const [showRequestMenu, setShowRequestMenu] = useState(false);
+  const [showEmptyFindMenu, setShowEmptyFindMenu] = useState(false);
+  const [showEmptyRequestMenu, setShowEmptyRequestMenu] = useState(false);
 
   const navigate = useNavigate();
 
@@ -452,12 +454,109 @@ export default function Dashboard() {
                 Post a request or browse our surgeon network to get started
               </p>
               <div className="flex gap-3 justify-center">
-                <button onClick={() => navigate('/find-surgeon')} className="btn-secondary px-6 py-2 text-sm">
-                  🔍 Find a Surgeon
-                </button>
-                <button onClick={() => navigate('/new-request')} className="btn-primary px-6 py-2 text-sm">
-                  + New Request
-                </button>
+                {/* Find a Surgeon — dropdown with all 4 case types */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => { setShowEmptyFindMenu(prev => !prev); setShowEmptyRequestMenu(false); }}
+                    className="btn-secondary px-6 py-2 text-sm"
+                  >
+                    🔍 Find a Surgeon ▾
+                  </button>
+                  {showEmptyFindMenu && (
+                    <>
+                      <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                        onClick={() => setShowEmptyFindMenu(false)}
+                      />
+                      <div style={{
+                        position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+                        marginTop: '6px', width: '240px', backgroundColor: '#ffffff',
+                        borderRadius: '12px', border: '1px solid #E8E0D8',
+                        boxShadow: '0 8px 24px rgba(68, 44, 20, 0.15)', zIndex: 50, overflow: 'hidden',
+                      }}>
+                        {[
+                          { emoji: '🚨', label: 'Emergency', path: '/find-surgeon?type=emergency', red: true },
+                          { emoji: '🏥', label: 'OPD Consultation', path: '/find-surgeon?type=opd' },
+                          { emoji: '🔄', label: 'Re-consultation', path: '/find-surgeon?type=reconsult' },
+                          { emoji: '🔪', label: 'Elective Surgery', path: '/find-surgeon?type=elective' },
+                        ].map(({ emoji, label, path, red }, idx, arr) => (
+                          <button
+                            key={label}
+                            onClick={() => { setShowEmptyFindMenu(false); navigate(path); }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '10px',
+                              width: '100%', padding: '12px 16px',
+                              fontSize: '13px', fontWeight: red ? '600' : '500',
+                              color: red ? '#dc2626' : '#444444',
+                              backgroundColor: red ? '#FEF2F2' : '#ffffff',
+                              border: 'none', cursor: 'pointer',
+                              fontFamily: '"DM Sans", sans-serif', textAlign: 'left',
+                              borderBottom: idx < arr.length - 1 ? `1px solid ${red ? '#FECACA' : '#E8E0D8'}` : 'none',
+                              transition: 'background-color 0.15s',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = red ? '#FEE2E2' : '#FDF8F5'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = red ? '#FEF2F2' : '#ffffff'}
+                          >
+                            <span style={{ fontSize: '16px' }}>{emoji}</span>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* + New Request — dropdown with all 4 case types */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => { setShowEmptyRequestMenu(prev => !prev); setShowEmptyFindMenu(false); }}
+                    className="btn-primary px-6 py-2 text-sm"
+                  >
+                    + New Request ▾
+                  </button>
+                  {showEmptyRequestMenu && (
+                    <>
+                      <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                        onClick={() => setShowEmptyRequestMenu(false)}
+                      />
+                      <div style={{
+                        position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+                        marginTop: '6px', width: '240px', backgroundColor: '#ffffff',
+                        borderRadius: '12px', border: '1px solid #E8E0D8',
+                        boxShadow: '0 8px 24px rgba(68, 44, 20, 0.15)', zIndex: 50, overflow: 'hidden',
+                      }}>
+                        {[
+                          { emoji: '🚨', label: 'Emergency', path: '/emergency-request', red: true },
+                          { emoji: '🏥', label: 'OPD Consultation', path: '/opd-request' },
+                          { emoji: '🔄', label: 'Re-consultation', path: '/reconsult-request' },
+                          { emoji: '🔪', label: 'Elective Surgery', path: '/new-request' },
+                        ].map(({ emoji, label, path, red }, idx, arr) => (
+                          <button
+                            key={label}
+                            onClick={() => { setShowEmptyRequestMenu(false); navigate(path); }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '10px',
+                              width: '100%', padding: '12px 16px',
+                              fontSize: '13px', fontWeight: red ? '600' : '500',
+                              color: red ? '#dc2626' : '#444444',
+                              backgroundColor: red ? '#FEF2F2' : '#ffffff',
+                              border: 'none', cursor: 'pointer',
+                              fontFamily: '"DM Sans", sans-serif', textAlign: 'left',
+                              borderBottom: idx < arr.length - 1 ? `1px solid ${red ? '#FECACA' : '#E8E0D8'}` : 'none',
+                              transition: 'background-color 0.15s',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = red ? '#FEE2E2' : '#FDF8F5'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = red ? '#FEF2F2' : '#ffffff'}
+                          >
+                            <span style={{ fontSize: '16px' }}>{emoji}</span>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
