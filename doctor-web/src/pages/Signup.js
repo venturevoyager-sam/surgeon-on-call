@@ -356,7 +356,26 @@ export default function Signup() {
 
             {/* Location map */}
             <div style={{ marginBottom: '14px' }}>
-              <label className={labelCls} style={labelStyle}>Preferred Location (drag pin)</label>
+              <label className={labelCls} style={labelStyle}>Preferred Location (drag pin or use current location)</label>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!navigator.geolocation) return;
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => { set('preferred_lat', pos.coords.latitude); set('preferred_lng', pos.coords.longitude); },
+                    () => {},
+                    { enableHighAccuracy: true, timeout: 10000 }
+                  );
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 14px', marginBottom: '8px',
+                  backgroundColor: '#FFFFFF', border: '1px solid #E8E0D8', borderRadius: '8px',
+                  fontSize: '13px', fontWeight: '500', color: '#E56717', cursor: 'pointer',
+                }}
+              >
+                <span style={{ fontSize: '16px' }}>📍</span> Use my current location
+              </button>
               <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #E8E0D8', height: '200px' }}>
                 <MapContainer center={[form.preferred_lat, form.preferred_lng]} zoom={12}
                   style={{ height: '100%', width: '100%' }} scrollWheelZoom>
