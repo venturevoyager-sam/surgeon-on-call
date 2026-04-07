@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Surgeon on Call — India's pioneering platform connecting hospitals with elite, certified surgeons on demand." />
+  <title>Surgeon on Call — Your Trusted Surgical Expert, on Time, on Demand</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --orange: #E56717;
+      --orange-dark: #CD4D00;
+      --bg: #FDF8F5;
+      --text: #444444;
+      --header: #2C1A0E;
+      --muted: #8B8B8B;
+      --border: #E8E0D8;
+      --card: #FFFFFF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+
+    .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── Header ── */
+    header {
+      background: var(--header);
+      padding: 18px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo img { height: 42px; width: auto; display: block; }
+    .logo .logo-text { display: inline; }
+    .logo .logo-text span { color: var(--orange); }
+    .hero-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      margin: 0 auto 28px;
+      flex-wrap: wrap;
+    }
+    .hero-brand img.icon { height: 160px; width: auto; }
+    .hero-wordmark {
+      max-width: 560px;
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    @media (max-width: 600px) {
+      .hero-brand img.icon { height: 110px; }
+      .hero-wordmark { max-width: 360px; }
+    }
+    .nav-cta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-block;
+      padding: 11px 22px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      border: 2px solid transparent;
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--orange);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--orange-dark); transform: translateY(-1px); }
+    .btn-outline {
+      background: transparent;
+      color: #fff;
+      border-color: rgba(255,255,255,0.4);
+    }
+    .btn-outline:hover { border-color: var(--orange); color: var(--orange); }
+    .btn-large { padding: 16px 32px; font-size: 16px; }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 90px 0 80px;
+      text-align: center;
+      background: linear-gradient(180deg, var(--bg) 0%, #FFF2E8 100%);
+    }
+    .hero .eyebrow {
+      display: inline-block;
+      background: rgba(229, 103, 23, 0.1);
+      color: var(--orange);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      letter-spacing: 0.5px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 60px);
+      font-weight: 800;
+      color: var(--header);
+      line-height: 1.1;
+      margin-bottom: 24px;
+      letter-spacing: -1.5px;
+    }
+    .hero h1 span { color: var(--orange); }
+    .hero p {
+      font-size: clamp(16px, 1.6vw, 19px);
+      max-width: 720px;
+      margin: 0 auto 40px;
+      color: var(--text);
+    }
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* ── Section base ── */
+    section { padding: 80px 0; }
+    .eyebrow-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--orange);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .section-title {
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 800;
+      color: var(--header);
+      text-align: center;
+      margin-bottom: 12px;
+      letter-spacing: -0.8px;
+      line-height: 1.15;
+    }
+    .section-sub {
+      text-align: center;
+      max-width: 680px;
+      margin: 0 auto 56px;
+      font-size: 17px;
+      color: var(--muted);
+    }
+
+    /* ── How It Works ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+    .step {
+      background: var(--card);
+      padding: 32px 24px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      text-align: center;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .step:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(229, 103, 23, 0.12); border-color: var(--orange); }
+    .step-num {
+      width: 48px;
+      height: 48px;
+      background: var(--orange);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      margin: 0 auto 18px;
+    }
+    .step h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--header);
+      margin-bottom: 10px;
+    }
+    .step p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* ── Who Is It For ── */
+    .who { background: #fff; }
+    .audiences {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .audience {
+      padding: 36px 28px;
+      border-radius: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      transition: all 0.25s ease;
+    }
+    .audience:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.06); }
+    .audience-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: var(--orange);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+    .audience h3 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--header);
+      margin-bottom: 12px;
+    }
+    .audience p { font-size: 15px; color: var(--text); }
+
+    /* ── Join Network ── */
+    .join {
+      background: linear-gradient(135deg, #FFF2E8 0%, var(--bg) 100%);
+    }
+    .join-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+    .join-card {
+      background: var(--card);
+      padding: 44px 36px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+    }
+    .join-card h3 {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--header);
+      margin-bottom: 14px;
+    }
+    .join-card p {
+      font-size: 16px;
+      color: var(--text);
+      margin-bottom: 28px;
+      min-height: 50px;
+    }
+
+    /* ── Contact ── */
+    .contact { background: var(--card); }
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 16px;
+    }
+    .contact-card {
+      text-align: center;
+      padding: 32px 20px;
+      background: var(--bg);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+    .contact-icon { font-size: 32px; margin-bottom: 12px; }
+    .contact-card .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .contact-card .value {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--header);
+      word-break: break-word;
+    }
+    .contact-card a:hover { color: var(--orange); }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--header);
+      color: #DDD;
+      padding: 48px 0 28px;
+      text-align: center;
+    }
+    footer .logo { display: inline-block; margin-bottom: 16px; }
+    footer p { font-size: 14px; color: rgba(255,255,255,0.65); margin-bottom: 8px; }
+    footer .small { font-size: 12px; opacity: 0.55; margin-top: 18px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .steps { grid-template-columns: repeat(2, 1fr); }
+      .audiences { grid-template-columns: 1fr; }
+      .join-grid { grid-template-columns: 1fr; }
+      .contact-grid { grid-template-columns: 1fr; }
+      section { padding: 60px 0; }
+      .hero { padding: 60px 0 50px; }
+    }
+    @media (max-width: 600px) {
+      .steps { grid-template-columns: 1fr; }
+      .nav-cta .btn { padding: 9px 14px; font-size: 13px; }
+      .logo { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="container nav">
+      <a href="#" class="logo">
+        <img src="logo-icon.png" alt="Surgeon on Call" />
+        <span class="logo-text"><span style="color:#fff;">Surgeon </span><span>on Call</span></span>
+      </a>
+      <div class="nav-cta">
+        <a href="https://doctor.surgeononcall.in/signup" class="btn btn-outline">I am a Doctor</a>
+        <a href="https://hospital.surgeononcall.in/signup" class="btn btn-primary">I am a Hospital</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-brand">
+        <img src="logo-icon.png" alt="" class="icon" />
+        <img src="logo-wordmark.png" alt="Surgeon on Call" class="hero-wordmark" />
+      </div>
+      <span class="eyebrow">India's Pioneering Surgical Network</span>
+      <h1>Your Trusted <span>Surgical Expert</span><br>on Time, on Demand</h1>
+      <p>
+        <strong>Surgeon on Call</strong> connects hospitals and healthcare facilities with an elite
+        network of certified, experienced surgeons from the country's most prestigious medical
+        institutions.
+      </p>
+      <div class="hero-cta">
+        <a href="https://doctor.surgeononcall.in/signup" class="btn btn-primary btn-large">I am a Doctor</a>
+        <a href="https://hospital.surgeononcall.in/signup" class="btn btn-primary btn-large" style="background:#fff;color:var(--orange);border:2px solid var(--orange);">I am a Hospital</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── How It Works ── -->
+  <section id="how">
+    <div class="container">
+      <span class="eyebrow-label">How It Works</span>
+      <h2 class="section-title">Simple. Seamless.</h2>
+      <p class="section-sub">A 4-step process from selection to surgery.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h3>Browse Surgeons</h3>
+          <p>Explore verified profiles of specialist surgeons across every major surgical discipline.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h3>View Credentials</h3>
+          <p>Dive into each surgeon's professional portfolio to make an informed decision.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h3>Book with Ease</h3>
+          <p>Select your preferred surgeon, choose the time and date based on availability.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <h3>Excellence Delivered</h3>
+          <p>The surgeon arrives as scheduled, delivering expert care.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Who Is It For ── -->
+  <section class="who">
+    <div class="container">
+      <span class="eyebrow-label">Who Is It For?</span>
+      <h2 class="section-title">Built for Every Surgical Setting</h2>
+      <p class="section-sub">
+        A first-of-its-kind platform that redefines surgical access — empowering high-volume
+        hospitals and resource-limited centers alike with on-demand, top-tier surgical talent.
+      </p>
+      <div class="audiences">
+        <div class="audience">
+          <div class="audience-icon">🏥</div>
+          <h3>Hospitals &amp; Surgical Centers</h3>
+          <p>Facing short-term gaps or expanding services? We provide reliable surgical coverage on demand.</p>
+        </div>
+        <div class="audience">
+          <div class="audience-icon">🎓</div>
+          <h3>Medical Colleges &amp; Teaching Hospitals</h3>
+          <p>Need support for complex cases or guest surgical faculty? We match the right surgeon to your academic and clinical needs.</p>
+        </div>
+        <div class="audience">
+          <div class="audience-icon">🩺</div>
+          <h3>Govt. &amp; Private Clinics with OR Access</h3>
+          <p>Bring top-tier specialists to your clinic on a case-by-case basis, tailored to your surgical needs.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Join Network ── -->
+  <section class="join">
+    <div class="container">
+      <span class="eyebrow-label">Join Our Network</span>
+      <h2 class="section-title">Be Part of India's Premier Surgical Platform</h2>
+      <div class="join-grid" style="margin-top:48px;">
+        <div class="join-card">
+          <h3>For Surgeons</h3>
+          <p>Showcase your expertise and get booked nationwide — on your terms.</p>
+          <a href="https://doctor.surgeononcall.in/signup" class="btn btn-primary btn-large">I am a Doctor</a>
+        </div>
+        <div class="join-card">
+          <h3>For Hospitals</h3>
+          <p>Access verified, top-tier surgeons instantly for any specialty.</p>
+          <a href="https://hospital.surgeononcall.in/signup" class="btn btn-primary btn-large">I am a Hospital</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Get In Touch ── -->
+  <section class="contact" id="contact">
+    <div class="container">
+      <span class="eyebrow-label">Get In Touch</span>
+      <h2 class="section-title">We'd Love to Hear From You</h2>
+      <p class="section-sub">
+        Discover how Surgeon on Call can support your surgical needs.
+      </p>
+      <div class="contact-grid">
+        <div class="contact-card">
+          <div class="contact-icon">✉️</div>
+          <div class="label">Email</div>
+          <div class="value"><a href="mailto:caredesk.soc@gmail.com">caredesk.soc@gmail.com</a></div>
+        </div>
+        <div class="contact-card">
+          <div class="contact-icon">📞</div>
+          <div class="label">Phone</div>
+          <div class="value"><a href="tel:+919110374459">+91 91103 74459</a></div>
+        </div>
+        <div class="contact-card">
+          <div class="contact-icon">🌐</div>
+          <div class="label">Follow Us</div>
+          <div class="value">@surgeononcall</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="container">
+      <a href="#" class="logo">Surgeon <span>on Call</span></a>
+      <p>India's trusted surgical expert network — on time, on demand.</p>
+      <p class="small">© <span id="year"></span> Surgeon on Call (OPC) Pvt Ltd. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

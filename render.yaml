@@ -40,3 +40,14 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  # ── LANDING WEB (marketing site, plain HTML) ──────────────────────────
+  - type: web
+    name: surgeon-on-call-landing
+    runtime: static
+    rootDir: landing-web
+    buildCommand: ""
+    staticPublishPath: .
+    domains:
+      - surgeononcall.in
+      - www.surgeononcall.in
