@@ -265,8 +265,8 @@ export default function ProfileScreen({ onLogout, surgeonId }) {
           <View>
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Medical Registration</Text>
-              <Field label="MCI Number">
-                <TextInput style={styles.input} value={mciNumber} onChangeText={setMciNumber} placeholder="e.g. MCI-12345" placeholderTextColor={B.muted} />
+              <Field label="Registration Number">
+                <TextInput style={styles.input} value={mciNumber} onChangeText={setMciNumber} placeholder="Registration number" placeholderTextColor={B.muted} />
               </Field>
               <Field label="UG College">
                 <TextInput style={styles.input} value={ugCollege} onChangeText={setUgCollege} placeholder="MBBS college name" placeholderTextColor={B.muted} />
@@ -328,7 +328,7 @@ export default function ProfileScreen({ onLogout, surgeonId }) {
             {/* Certificate */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Medical Certificate</Text>
-              <Text style={styles.cardSubtitle}>MCI registration certificate or degree</Text>
+              <Text style={styles.cardSubtitle}>Registration certificate or degree</Text>
               {surgeon?.certificate_url ? (
                 <View style={styles.uploadedContainer}>
                   <View style={styles.uploadedFile}>

@@ -217,7 +217,7 @@ export default function Profile() {
       <div className={sectionCls} style={sectionStyle}>
         <h3 className="text-xs font-bold uppercase tracking-wide mb-4" style={{ color: '#E56717' }}>Credentials</h3>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={labelCls} style={labelStyle}>MCI Number</label>
+          <div><label className={labelCls} style={labelStyle}>Registration Number</label>
             <input className={inputCls} style={inputStyle} value={form.mci_number} onChange={e => set('mci_number', e.target.value)} /></div>
           <div><label className={labelCls} style={labelStyle}>Highest Qualification</label>
             <input className={inputCls} style={inputStyle} value={form.highest_qualification} onChange={e => set('highest_qualification', e.target.value)} /></div>

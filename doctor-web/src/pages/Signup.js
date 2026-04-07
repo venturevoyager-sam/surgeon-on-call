@@ -143,7 +143,7 @@ export default function Signup() {
       if (form.specialty.length === 0) return 'Please select at least one specialty';
     }
     if (s === 4) {
-      if (!form.mci_number.trim()) return 'MCI registration number is required';
+      if (!form.mci_number.trim()) return 'Registration number is required';
     }
     if (s === 6) {
       if (!form.declaration_agreed) return 'Please agree to the declaration';
@@ -448,9 +448,9 @@ export default function Signup() {
           <div>
             <h2 className="text-lg font-bold mb-4" style={{ color: '#444444' }}>Verification & Credentialing</h2>
             <div style={{ marginBottom: '14px' }}>
-              <label className={labelCls} style={labelStyle}>MCI Registration Number *</label>
+              <label className={labelCls} style={labelStyle}>Registration Number *</label>
               <input className={inputCls} style={inputStyle} value={form.mci_number}
-                onChange={e => set('mci_number', e.target.value)} placeholder="e.g. MCI-AP-12345" />
+                onChange={e => set('mci_number', e.target.value)} placeholder="Registration number" />
             </div>
 
             {/* Document uploads */}
