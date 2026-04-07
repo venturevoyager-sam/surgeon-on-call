@@ -20,6 +20,8 @@ services:
     rootDir: hospital-web
     buildCommand: npm install && npm run build
     staticPublishPath: build
+    domains:
+      - hospital.surgeononcall.in
     routes:
       - type: rewrite
         source: /*
@@ -32,6 +34,8 @@ services:
     rootDir: doctor-web
     buildCommand: npm install && npm run build
     staticPublishPath: build
+    domains:
+      - doctor.surgeononcall.in
     routes:
       - type: rewrite
         source: /*
