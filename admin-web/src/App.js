@@ -487,6 +487,12 @@ function SurgeonsTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searching,   setSearching]   = useState(false);
 
+  // ── View surgeon modal state ──
+  const [viewSurgeon, setViewSurgeon] = useState(null);
+
+  // ── Reset password button state — keyed by surgeon id: 'idle' | 'loading' | 'success' | 'error' ──
+  const [resetState, setResetState] = useState({});
+
   // ── Edit surgeon modal state ──
   const [editSurgeon, setEditSurgeon] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -620,6 +626,19 @@ function SurgeonsTab() {
     } catch (err) { showMsg('Action failed'); }
   };
 
+  const resetPassword = async (id) => {
+    setResetState(p => ({ ...p, [id]: 'loading' }));
+    try {
+      await axios.patch(`${API_URL}/api/surgeons/${id}/reset-password`);
+      setResetState(p => ({ ...p, [id]: 'success' }));
+      setTimeout(() => setResetState(p => ({ ...p, [id]: 'idle' })), 2000);
+    } catch (err) {
+      console.error('Reset password failed:', err);
+      setResetState(p => ({ ...p, [id]: 'error' }));
+      setTimeout(() => setResetState(p => ({ ...p, [id]: 'idle' })), 2000);
+    }
+  };
+
   const suspendAction = async (id, action) => {
     try {
       await axios.patch(`${API_URL}/api/admin/surgeons/${id}/suspend`, { action });
@@ -717,6 +736,7 @@ function SurgeonsTab() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
+                        <ActionBtn color="teal" onClick={() => setViewSurgeon(s)}>View</ActionBtn>
                         <ActionBtn color="blue" onClick={() => openEditModal(s)}>Edit</ActionBtn>
                         {!s.verified && s.status !== 'suspended' && (
                           <>
@@ -744,6 +764,28 @@ function SurgeonsTab() {
                             Docs
                           </a>
                         )}
+                        {(() => {
+                          const st = resetState[s.id] || 'idle';
+                          const isLoading = st === 'loading';
+                          const label =
+                            st === 'loading' ? 'Resetting...'
+                            : st === 'success' ? '✓ Reset'
+                            : st === 'error'   ? '✗ Failed'
+                            : 'Reset Password';
+                          const cls =
+                            st === 'success' ? 'bg-gray-100 text-green-600'
+                            : st === 'error' ? 'bg-gray-100 text-red-600'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200';
+                          return (
+                            <button
+                              onClick={() => resetPassword(s.id)}
+                              disabled={isLoading || st === 'success' || st === 'error'}
+                              className={`px-2 py-1 rounded text-xs font-semibold transition disabled:cursor-not-allowed ${cls}`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>
@@ -899,6 +941,127 @@ function SurgeonsTab() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {/* ── View Surgeon Modal — full read-only profile dump ── */}
+      {viewSurgeon && (
+        <Modal title={`Surgeon Details — ${viewSurgeon.name || '—'}`} onClose={() => setViewSurgeon(null)} maxWidth="max-w-3xl">
+          <SurgeonDetailView surgeon={viewSurgeon} />
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100 sticky bottom-0 bg-white pb-1">
+            <button onClick={() => setViewSurgeon(null)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+              Close
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── Read-only surgeon profile renderer used by the View modal ──────────────
+function SurgeonDetailView({ surgeon }) {
+  const formatValue = (key, val) => {
+    if (val === null || val === undefined || val === '') return <span className="text-gray-400 italic">—</span>;
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    if (Array.isArray(val)) return val.length ? val.join(', ') : <span className="text-gray-400 italic">—</span>;
+    if (typeof val === 'string' && /^https?:\/\//i.test(val)) {
+      return <a href={val} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all">{val}</a>;
+    }
+    if (key === 'avg_hourly_rate' && typeof val === 'number') return `₹${(val / 100).toLocaleString('en-IN')}`;
+    if (typeof val === 'object') return <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto">{JSON.stringify(val, null, 2)}</pre>;
+    return String(val);
+  };
+
+  const labelize = (k) => k.replace(/_/g, ' ').replace(/\burl\b/i, 'URL').replace(/^\w/, c => c.toUpperCase());
+
+  const groups = [
+    { title: 'Personal', keys: ['id', 'name', 'phone', 'email', 'city', 'experience_years', 'highest_qualification', 'mci_number'] },
+    { title: 'Practice', keys: ['specialty', 'key_procedures', 'practice_type', 'hospital_affiliations', 'avg_hourly_rate', 'rating', 'total_cases', 'communication_preference', 'open_to_emergency', 'open_to_teleconsultation', 'open_to_physical_visits', 'travel_radius_km', 'bio'] },
+    { title: 'Status', keys: ['verified', 'available', 'status', 'declaration_agreed', 'created_at', 'updated_at'] },
+    { title: 'Documents', keys: ['profile_photo_url', 'certificate_url', 'government_id_url', 'resume_url'] },
+  ];
+
+  const knownKeys = new Set(groups.flatMap(g => g.keys).concat(['preferred_lat', 'preferred_lng', 'preferred_location_name', 'address']));
+  const otherKeys = Object.keys(surgeon).filter(k => !knownKeys.has(k));
+
+  const lat = surgeon.preferred_lat;
+  const lng = surgeon.preferred_lng;
+  const hasCoords = lat != null && lng != null;
+  const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+  const embedUrl = hasCoords ? `https://maps.google.com/maps?q=${lat},${lng}&z=14&output=embed` : null;
+
+  return (
+    <div className="space-y-6">
+      {surgeon.profile_photo_url && (
+        <div className="flex justify-center">
+          <img src={surgeon.profile_photo_url} alt={surgeon.name} className="w-28 h-28 rounded-full object-cover border-2 border-gray-200" />
+        </div>
+      )}
+
+      {groups.map(g => (
+        <div key={g.title}>
+          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 border-b border-gray-200 pb-1 mb-3">{g.title}</h4>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            {g.keys.map(k => (
+              <div key={k}>
+                <div className="text-xs text-gray-500">{labelize(k)}</div>
+                <div className="text-sm text-gray-800 break-words">{formatValue(k, surgeon[k])}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div>
+        <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 border-b border-gray-200 pb-1 mb-3">Preferred Location</h4>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-3">
+          <div>
+            <div className="text-xs text-gray-500">Location Name</div>
+            <div className="text-sm text-gray-800 break-words">{formatValue('preferred_location_name', surgeon.preferred_location_name)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">Address</div>
+            <div className="text-sm text-gray-800 break-words">{formatValue('address', surgeon.address)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">Latitude</div>
+            <div className="text-sm text-gray-800">{formatValue('preferred_lat', lat)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">Longitude</div>
+            <div className="text-sm text-gray-800">{formatValue('preferred_lng', lng)}</div>
+          </div>
+        </div>
+        {hasCoords ? (
+          <div>
+            <iframe
+              title="Surgeon location map"
+              src={embedUrl}
+              className="w-full h-64 rounded-lg border border-gray-200"
+              loading="lazy"
+            />
+            <a href={mapsUrl} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs text-blue-600 hover:underline">
+              Open in Google Maps ↗
+            </a>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-400 italic">No coordinates set</div>
+        )}
+      </div>
+
+      {otherKeys.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 border-b border-gray-200 pb-1 mb-3">Other Fields</h4>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            {otherKeys.map(k => (
+              <div key={k}>
+                <div className="text-xs text-gray-500">{labelize(k)}</div>
+                <div className="text-sm text-gray-800 break-words">{formatValue(k, surgeon[k])}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1007,5 +1007,35 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/surgeons/:id/reset-password
+// Resets a surgeon's password to the default hardcoded hash.
+// Called by: Admin Web → Surgeons tab → "Reset Password" button
+// ─────────────────────────────────────────────────────────────────────────────
+const DEFAULT_PASSWORD_HASH = '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
+
+router.patch('/:id/reset-password', async (req, res) => {
+  try {
+    const { id } = req.params;
+    logger.info('Resetting surgeon password to default', { surgeon_id: id });
+
+    const { error } = await supabase
+      .from('surgeon_auth')
+      .update({ password_hash: DEFAULT_PASSWORD_HASH })
+      .eq('surgeon_id', id);
+
+    if (error) {
+      logger.error('Reset password: update failed', { surgeon_id: id, error: error.message });
+      return res.status(500).json({ message: 'Failed to reset password' });
+    }
+
+    logger.info('Surgeon password reset to default', { surgeon_id: id });
+    return res.json({ message: 'Password reset to default' });
+  } catch (error) {
+    logger.error('Reset password: unexpected error', { error: error.message });
+    return res.status(500).json({ message: 'Something went wrong' });
+  }
+});
+
 
 module.exports = router;
