@@ -132,12 +132,39 @@ export default function Signup() {
     }
   };
 
+  // ── Per-step validation ──
+  const validateStep = (s) => {
+    if (s === 1) {
+      if (!form.name.trim()) return 'Full name is required';
+      if (!form.phone.trim()) return 'Mobile number is required';
+      if (!form.city.trim()) return 'Current city is required';
+    }
+    if (s === 2) {
+      if (form.specialty.length === 0) return 'Please select at least one specialty';
+    }
+    if (s === 4) {
+      if (!form.mci_number.trim()) return 'MCI registration number is required';
+    }
+    if (s === 6) {
+      if (!form.declaration_agreed) return 'Please agree to the declaration';
+    }
+    return '';
+  };
+
+  const handleNext = () => {
+    const err = validateStep(step);
+    if (err) { setError(err); return; }
+    setError('');
+    setStep(s => s + 1);
+  };
+
   // ── Submit ──
   const handleSubmit = async () => {
-    if (!form.declaration_agreed) { setError('Please agree to the declaration'); return; }
-    if (!form.name.trim() || !form.phone.trim()) { setError('Name and phone are required'); return; }
-    if (!form.mci_number.trim()) { setError('MCI number is required'); return; }
-    if (!form.city.trim()) { setError('City is required'); return; }
+    // Re-run all validations as a final safeguard
+    for (let s = 1; s <= 6; s++) {
+      const err = validateStep(s);
+      if (err) { setStep(s); setError(err); return; }
+    }
 
     setSubmitting(true); setError('');
     try {
@@ -499,7 +526,7 @@ export default function Signup() {
             </button>
           )}
           {step < 6 ? (
-            <button type="button" onClick={() => { setStep(s => s + 1); setError(''); }}
+            <button type="button" onClick={handleNext}
               className="flex-1 py-3 rounded-lg text-white text-sm font-semibold"
               style={{ backgroundColor: '#E56717' }}>
               Next →
