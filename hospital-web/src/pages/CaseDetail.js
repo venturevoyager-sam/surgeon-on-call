@@ -276,7 +276,7 @@ export default function CaseDetail() {
   const requestTypeBadge = {
     emergency: { cls: 'bg-red-100 text-red-600',    label: 'Emergency' },
     opd:       { cls: 'bg-blue-100 text-blue-600',   label: 'OPD' },
-    reconsult: { cls: 'bg-purple-100 text-purple-600', label: 'Re-consult' },
+    reconsult: { cls: 'bg-purple-100 text-purple-600', label: 'Cross Consult' },
     elective:  { cls: 'bg-gray-100 text-gray-500',   label: 'Elective' },
   };
 

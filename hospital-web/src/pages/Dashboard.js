@@ -315,7 +315,7 @@ export default function Dashboard() {
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
                   >
                     <span style={{ fontSize: '16px' }}>🔄</span>
-                    Re-consultation
+                    Cross Consultation
                   </button>
 
                   {/* Elective Surgery (standard — goes to existing NewRequest.js) */}
@@ -477,7 +477,7 @@ export default function Dashboard() {
                         {[
                           { emoji: '🚨', label: 'Emergency', path: '/find-surgeon?type=emergency', red: true },
                           { emoji: '🏥', label: 'OPD Consultation', path: '/find-surgeon?type=opd' },
-                          { emoji: '🔄', label: 'Re-consultation', path: '/find-surgeon?type=reconsult' },
+                          { emoji: '🔄', label: 'Cross Consultation', path: '/find-surgeon?type=reconsult' },
                           { emoji: '🔪', label: 'Elective Surgery', path: '/find-surgeon?type=elective' },
                         ].map(({ emoji, label, path, red }, idx, arr) => (
                           <button
@@ -529,7 +529,7 @@ export default function Dashboard() {
                         {[
                           { emoji: '🚨', label: 'Emergency', path: '/emergency-request', red: true },
                           { emoji: '🏥', label: 'OPD Consultation', path: '/opd-request' },
-                          { emoji: '🔄', label: 'Re-consultation', path: '/reconsult-request' },
+                          { emoji: '🔄', label: 'Cross Consultation', path: '/reconsult-request' },
                           { emoji: '🔪', label: 'Elective Surgery', path: '/new-request' },
                         ].map(({ emoji, label, path, red }, idx, arr) => (
                           <button

@@ -126,7 +126,7 @@ export default function ReconsultRequest() {
       e.specialty_required = 'Please select a specialty';
 
     if (!form.surgery_date)
-      e.surgery_date = 'Please select a re-consultation date';
+      e.surgery_date = 'Please select a cross consultation date';
 
     if (!form.surgery_time)
       e.surgery_time = 'Please select a time';
@@ -142,7 +142,7 @@ export default function ReconsultRequest() {
 
     // Reason for re-consultation is required
     if (!form.reason.trim())
-      e.reason = 'Please describe the reason for re-consultation';
+      e.reason = 'Please describe the reason for cross consultation';
 
     // Fee is required — must be a positive number
     if (!form.fee || Number(form.fee) <= 0)
@@ -175,7 +175,7 @@ export default function ReconsultRequest() {
 
       const response = await axios.post(`${API_URL}/api/cases`, {
         hospital_id:        hospital.id,
-        procedure:          `Re-consultation: ${form.reason.trim()}`,  // stored in procedure field
+        procedure:          `Cross Consultation: ${form.reason.trim()}`,  // stored in procedure field
         specialty_required: form.specialty_required,
         surgery_date:       form.surgery_date,
         surgery_time:       form.surgery_time,
@@ -231,10 +231,10 @@ export default function ReconsultRequest() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-1">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-600 uppercase tracking-wide">
-              Re-consult
+              Cross Consult
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-body">Re-consultation Request</h2>
+          <h2 className="text-2xl font-bold text-body">Cross Consultation Request</h2>
           <p className="text-muted text-sm mt-1">
             Request a follow-up consultation with a surgeon. You'll select your preferred surgeons after submission.
           </p>
@@ -280,7 +280,7 @@ export default function ReconsultRequest() {
 
               {/* Date */}
               <div>
-                <label className="form-label">Re-consultation Date *</label>
+                <label className="form-label">Cross Consultation Date *</label>
                 <input
                   type="date"
                   value={form.surgery_date}
@@ -376,7 +376,7 @@ export default function ReconsultRequest() {
           <div className="card mb-6">
             <h3 className="card-section-title">
               <span className="section-badge">3</span>
-              Reason for Re-consultation
+              Reason for Cross Consultation
             </h3>
 
             <div className="mb-4">

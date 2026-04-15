@@ -21,7 +21,7 @@ export const formatDate = (d) => {
 export const REQUEST_TYPE_STYLES = {
   emergency: { bg: '#FEF2F2', color: '#DC2626', label: 'Emergency' },
   opd:       { bg: '#EFF6FF', color: '#1D4ED8', label: 'OPD' },
-  reconsult: { bg: '#F5F3FF', color: '#7C3AED', label: 'Re-consult' },
+  reconsult: { bg: '#F5F3FF', color: '#7C3AED', label: 'Cross Consult' },
   elective:  { bg: '#F3F4F6', color: '#6B7280', label: 'Elective' },
 };
 

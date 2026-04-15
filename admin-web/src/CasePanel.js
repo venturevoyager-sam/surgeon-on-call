@@ -50,7 +50,7 @@ function formatFee(paise) {
 const REQUEST_TYPE_STYLES = {
   emergency:  { bg: '#FEF2F2', color: '#DC2626', label: 'Emergency' },
   opd:        { bg: '#EFF6FF', color: '#1D4ED8', label: 'OPD' },
-  reconsult:  { bg: '#F5F3FF', color: '#7C3AED', label: 'Re-consult' },
+  reconsult:  { bg: '#F5F3FF', color: '#7C3AED', label: 'Cross Consult' },
   elective:   { bg: '#F3F4F6', color: '#6B7280', label: 'Elective' },
 };
 
@@ -227,7 +227,7 @@ function CasePanelInner({ c, onClose }) {
               fontSize: '12px',
               color: '#7C3AED',
             }}>
-              <span style={{ fontWeight: '600' }}>Converted from re-consult</span>
+              <span style={{ fontWeight: '600' }}>Converted from cross consult</span>
               <span style={{ marginLeft: '6px', opacity: 0.7 }}>
                 (parent: {c.parent_case_id.slice(0, 8)}...)
               </span>
